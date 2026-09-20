@@ -126,8 +126,6 @@ Khi một chương trình được chạy, hệ điều hành tạo ra một pro
 
 Khi chạy lệnh này, hệ điều hành tạo một process cho calculator. Process có nhiều tài nguyên chẳng hạn như (virtual address space, code, global/static data, heap, file descriptors, các thông tin quản lý của kernel, một hoặc nhiều thread thực thi...). Nghĩa là, khi một chương trình được chạy thì hệ điều hành sẽ tạo một tiến trình, cấu trúc tiến trình cụ thể sẽ giống như :
 
-<div align="center">
-
 ```
 Process 
 | 
@@ -141,7 +139,5 @@ Process
 		|── Registers 
 		|── Stack
 ```
-
-</div>
 
 Trong đó ta thấy phần thread là một luồng thực thi bên trong process. Một process tối thiểu phải có một thread để thực thi chương trình. Thread đầu tiên thường được gọi là main thread. Khi sử dụng pthread, main thread có thể tạo thêm các thread khác.
