@@ -6,7 +6,7 @@
 
 	- [1.1.Process và Thread](#11process-và-thread)
 
-	- 1.2.Một process có thể có nhiều thread
+	- [1.2.Một process có thể có nhiều thread](#12một-process-có-thể-có-nhiều-thread)
 
 	- 1.3.Thread dùng chung và riêng những gì?
 
@@ -22,7 +22,7 @@
 
 	- 2.3.Biên dịch chương trình pthread
 
-- 3. Thread được tạo như thế nào?
+- 3.Thread được tạo như thế nào?
 
 	- 3.1.Hàm pthread_create()
 
@@ -116,7 +116,7 @@
 
 ## 1.Đa luồng là gì?
 
-### 1.1. Process và Thread
+### 1.1.Process và Thread
 
 Khi một chương trình được chạy, hệ điều hành tạo ra một process đại diện cho instance đang thực thi của chương trình. **Ví dụ:**
 
@@ -141,3 +141,20 @@ Process
 ```
 
 Trong đó ta thấy phần thread là một luồng thực thi bên trong process. Một process tối thiểu phải có một thread để thực thi chương trình. Thread đầu tiên thường được gọi là main thread. Khi sử dụng pthread, main thread có thể tạo thêm các thread khác.
+
+### 1.2.Một process có thể có nhiều thread
+
+Một chương trình đơn luồng sẽ có một thread, và thread này làm việc với nhiều tasks chẳng hạn theo sơ đồ:
+
+```
+Process 
+| 
+|── Main Thread 
+			| 
+			|── task A 
+			|── task B 
+			|── task C 
+			|── task D
+```
+
+với chương trình này thì sẽ dùng một lõi CPU trong tất cả lõi, vì thế ta luôn thấy biểu đồ đo CPU thường thấy trên linux luôn hiện một ngưỡng như 20-25% thay vì full 100%, nhưng khi vào htop ta thấy program đó lại dùng full 100%CPU (thực chất chúng dùng hết công suất của một luồng trong tất cả luồng hiện có, chứ ko phải dùng hết tất cả luồng trong CPU vật lý hiện có) ta nên phân biệt rõ điều này
