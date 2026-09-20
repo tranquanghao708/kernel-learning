@@ -188,10 +188,11 @@ Nếu phần cứng có đủ execution resources, nhiều thread có thể th�
 
 Các thread trong cùng process dùng chung address space. Khái niệm dùng chung và dùng riêng trong trường hợp này là nếu mà chung thì một đoạn code hay cái gì của chương trình nhưng tất cả thread cùng dùng nó thì gọi là dùng chung, còn dùng riêng thì mỗi thread đều có một cái riêng để dùng
 
-<table>
 
 <details>
 	<summary><b>[Chi tiết]</b> Address space là gì?</summary>
+
+<table>
 
 ---
 
@@ -199,9 +200,9 @@ Các thread trong cùng process dùng chung address space. Khái niệm dùng ch
 
 ---
 
-</details>
-
 </table>
+
+</details>
 
 Ví dụ:
 
