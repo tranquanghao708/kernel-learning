@@ -162,7 +162,6 @@ với chương trình này thì sẽ dùng một lõi CPU trong tất cả lõi,
 Nếu chương trình được cấp thêm các thread vào như :
 
 ```
-
 Process 
 | 
 |── Main Thread 
@@ -172,20 +171,68 @@ Process
 |── Thread 2 
 | 
 |── Thread 3
-
 ```
 
 thì hệ điều hành có thể lập lịch các thread này lên các CPU logical khác nhau. Ví dụ:
 
 ```
-
 CPU 0 <-> Thread 0
 CPU 1 <-> Thread 1
 CPU 2 <-> Thread 2
 CPU 3 <-> Thread 3
-
 ```
 
 Nếu phần cứng có đủ execution resources, nhiều thread có thể thực sự chạy đồng thời.
 
 ### 1.3.Thread dùng chung và riêng những gì?
+
+Các thread trong cùng process dùng chung address space. Khái niệm dùng chung và dùng riêng trong trường hợp này là nếu mà chung thì một đoạn code hay cái gì của chương trình nhưng tất cả thread cùng dùng nó thì gọi là dùng chung, còn dùng riêng thì mỗi thread đều có một cái riêng để dùng
+
+<table>
+
+<details>
+	<summary><b>[Chi tiết]</b> Address space là gì?</summary>
+
+---
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</details>
+
+</table>
+
+Ví dụ:
+
+```
+Process
+|
+|── Code       <- shared
+|── Global     <- shared
+|── Heap       <- shared
+|
+|── Thread 0
+|    |── Stack <- riêng
+|
+|── Thread 1
+|    |── Stack <- riêng
+|
+|── Thread 2
+     |── Stack <- riêng
+```
+
+Trong đó dùng chung. Các thread có thể truy cập: global variables, static variables, heap, vùng memory được cấp phát bởi malloc, file descriptors, code của process
+
+Còn dùng riêng. Mỗi thread có trạng thái thực thi riêng: registers, instruction pointer, stack, thread-local storage (TLS). **Ví dụ:**
+
+```c
+void *worker(void *arg)
+{
+    int x = 10;
+
+    return NULL;
+}
+```
+
+`x` nằm trên stack của thread đang thực hiện `worker()`.Thread khác không tự động có cùng biến `x`.
