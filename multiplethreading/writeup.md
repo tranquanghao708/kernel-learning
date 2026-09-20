@@ -8,7 +8,7 @@
 
 	- [1.2.Một process có thể có nhiều thread](#12một-process-có-thể-có-nhiều-thread)
 
-	- 1.3.Thread dùng chung và riêng những gì?
+	- [1.3.Thread dùng chung và riêng những gì?](#13thread-dùng-chung-và-riêng-những-gì)
 
 	- 1.4.Thread có thực sự chạy song song không?
 
@@ -157,4 +157,35 @@ Process
 			|── task D
 ```
 
-với chương trình này thì sẽ dùng một lõi CPU trong tất cả lõi, vì thế ta luôn thấy biểu đồ đo CPU thường thấy trên linux luôn hiện một ngưỡng như 20-25% thay vì full 100%, nhưng khi vào htop ta thấy program đó lại dùng full 100%CPU (thực chất chúng dùng hết công suất của một luồng trong tất cả luồng hiện có, chứ ko phải dùng hết tất cả luồng trong CPU vật lý hiện có) ta nên phân biệt rõ điều này
+với chương trình này thì sẽ dùng một lõi CPU trong tất cả lõi, vì thế ta luôn thấy biểu đồ đo CPU thường thấy trên linux luôn hiện một ngưỡng như 20-25% thay vì full 100%, nhưng khi vào htop ta thấy program đó lại dùng full 100% CPU (thực chất chúng dùng hết công suất của một luồng trong tất cả luồng hiện có, chứ ko phải dùng hết tất cả luồng trong CPU vật lý hiện có) ta nên phân biệt rõ điều này
+
+Nếu chương trình được cấp thêm các thread vào như :
+
+```
+
+Process 
+| 
+|── Main Thread 
+| 
+|── Thread 1 
+|
+|── Thread 2 
+| 
+|── Thread 3
+
+```
+
+thì hệ điều hành có thể lập lịch các thread này lên các CPU logical khác nhau. Ví dụ:
+
+```
+
+CPU 0 <-> Thread 0
+CPU 1 <-> Thread 1
+CPU 2 <-> Thread 2
+CPU 3 <-> Thread 3
+
+```
+
+Nếu phần cứng có đủ execution resources, nhiều thread có thể thực sự chạy đồng thời.
+
+### 1.3.Thread dùng chung và riêng những gì?
