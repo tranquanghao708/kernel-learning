@@ -193,6 +193,7 @@ Các thread trong cùng process dùng chung address space. Khái niệm dùng ch
 	<summary><b>[Chi tiết]</b> Address space là gì?</summary>
 
 <table>
+<tr>
 
 ---
 
@@ -200,6 +201,7 @@ Các thread trong cùng process dùng chung address space. Khái niệm dùng ch
 
 ---
 
+</tr>
 </table>
 
 </details>
