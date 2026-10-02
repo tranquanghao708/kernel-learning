@@ -81,12 +81,15 @@ Process
 |── File descriptors 
 | 
 |── Thread 
-		|── Instruction pointer 
-		|── Registers 
-		|── Stack
+	|── Instruction pointer 
+	|── Registers 
+	|── Stack
 ```
 
 Trong đó ta thấy phần thread là một luồng thực thi bên trong process. Một process tối thiểu phải có một thread để thực thi chương trình. Thread đầu tiên thường được gọi là main thread. Khi sử dụng pthread, main thread có thể tạo thêm các thread khác.
+
+> [!IMPORTANT]
+> **Điểm cốt lõi:** Process là đơn vị sở hữu tài nguyên và không gian địa chỉ; thread là đơn vị thực thi được kernel scheduler lập lịch.
 
 ### 1.2.Một process có thể có nhiều thread
 
@@ -96,14 +99,17 @@ Một chương trình đơn luồng sẽ có một thread, và thread này làm 
 Process 
 | 
 |── Main Thread 
-			| 
-			|── task A 
-			|── task B 
-			|── task C 
-			|── task D
+	| 
+	|── task A 
+	|── task B 
+	|── task C 
+	|── task D
 ```
 
-với chương trình này thì sẽ dùng một lõi CPU trong tất cả lõi, vì thế ta luôn thấy biểu đồ đo CPU thường thấy trên linux luôn hiện một ngưỡng như 20-25% thay vì full 100%, nhưng khi vào htop ta thấy program đó lại dùng full 100% CPU (thực chất chúng dùng hết công suất của một luồng trong tất cả luồng hiện có, chứ ko phải dùng hết tất cả luồng trong CPU vật lý hiện có) ta nên phân biệt rõ điều này
+Với một process chỉ có một thread thực thi, tại một thời điểm chỉ có tối đa một logical CPU thực thi thread đó. Tuy nhiên scheduler có thể di chuyển thread giữa các logical CPU theo thời gian. Vì thế ta luôn thấy biểu đồ đo CPU thường thấy trên linux luôn hiện một ngưỡng như `20-25%` thay vì full `100%`, nhưng khi vào htop ta thấy program đó lại dùng full `100%` CPU (thực chất chúng dùng hết công suất của một luồng trong tất cả luồng hiện có, chứ ko phải dùng hết tất cả luồng trong CPU vật lý hiện có) ta nên phân biệt rõ điều này
+
+> [!NOTE]
+> `20–25%` trong biểu đồ CPU nhưng htop lại `100%` thì phụ thuộc cách phần mềm hiên thị CPU usage. Ví dụ máy có 4 lõi CPU thì khi phần mềm như htop hiện `100% CPU usage` thì thực tê nó chỉ là `100 / 4 = 25%` và `25%` mới là con số mà tiến trình sử dụng trong cả tổng 4 lõi CPU. Nghĩa là nó chỉ dùng full 1 lõi chứ ko phải cả 4 lõi hiện có
 
 Nếu chương trình được cấp thêm các thread vào như :
 
