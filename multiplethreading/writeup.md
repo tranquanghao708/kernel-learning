@@ -138,7 +138,7 @@ Nếu phần cứng có đủ execution resources, nhiều thread có thể th�
 
 ### 1.3.Thread dùng chung và riêng những gì?
 
-Các thread trong cùng process dùng chung address space. Khái niệm dùng chung và dùng riêng trong trường hợp này là nếu mà chung thì một đoạn code hay cái gì của chương trình nhưng tất cả thread cùng dùng nó thì gọi là dùng chung, còn dùng riêng thì mỗi thread đều có một cái riêng để dùng
+Các thread trong cùng process dùng chung address space. Khái niệm dùng chung và dùng riêng trong trường hợp này là nếu các thread thuộc cùng một process có thể truy cập cùng một virtual address space. Vì vậy những vùng nhớ như global/static data và heap có thể được nhiều thread truy cập. Đây là shared memory (dùng chung bộ nhớ), còn dùng riêng thì đơn giản là mỗi thread đều có một cái riêng để dùng
 
 
 <details>
@@ -177,9 +177,31 @@ Process
      |── Stack <- riêng
 ```
 
-Trong đó dùng chung. Các thread có thể truy cập: global variables, static variables, heap, vùng memory được cấp phát bởi malloc, file descriptors, code của process
+Trong đó dùng chung. Các thread có thể truy cập: global variables, static variables, heap, vùng memory được cấp phát bởi malloc, file descriptors, code của process. tuy nhiên, ko phải cứ nhiều thread cùng truy cập là dùng chung ,ta có thể lấy ví dụ với code C :
 
-Còn dùng riêng. Mỗi thread có trạng thái thực thi riêng: registers, instruction pointer, stack, thread-local storage (TLS). **Ví dụ:**
+```c
+int global = 100;
+
+void *worker(void *arg){
+    printf("%d\n", global);
+    return NULL;
+}
+```
+
+Nếu thread có 4 luồng như :
+
+```
+Process
+│
+├── global = 100
+│
+├── Thread 0 ──┐
+├── Thread 1 ──┤
+├── Thread 2 ──┼──> cùng truy cập global
+└── Thread 3 ──┘
+```
+
+Điều đó không có nghĩa global được nhân thành 4 bản chia cho từng thread. Còn dùng riêng. Mỗi thread có trạng thái thực thi riêng: registers, instruction pointer, stack, thread-local storage (TLS). **Ví dụ:**
 
 ```c
 void *worker(void *arg)
