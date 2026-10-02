@@ -201,7 +201,7 @@ Process
 └── Thread 3 ──┘
 ```
 
-Điều đó không có nghĩa global được nhân thành 4 bản chia cho từng thread. Còn dùng riêng. Mỗi thread có trạng thái thực thi riêng: registers, instruction pointer, stack, thread-local storage (TLS). **Ví dụ:**
+Điều đó không có nghĩa global được nhân thành 4 bản chia cho từng thread. Còn dùng riêng, mỗi thread có trạng thái thực thi riêng: registers, instruction pointer, stack, thread-local storage (TLS). **Ví dụ:**
 
 ```c
 void *worker(void *arg)
@@ -212,4 +212,11 @@ void *worker(void *arg)
 }
 ```
 
-`x` nằm trên stack của thread đang thực hiện `worker()`.Thread khác không tự động có cùng biến `x`.
+`x` có automatic storage duration. Trong cách triển khai thông thường trên Linux/x86-64, biến local này được lưu trên stack của thread nếu compiler không tối ưu nó vào register hoặc loại bỏ hoàn toàn biến. **Ví dụ** compiler có thể biến:
+
+```c
+int x = 10;
+return NULL;
+```
+
+thành code mà không hề có một ô nhớ chứa `x = 10` trên stack.
