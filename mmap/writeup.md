@@ -136,6 +136,8 @@ Memory Mapping (ánh xạ bộ nhớ) là cơ chế thiết lập mối quan h�
 
 #### 1.1.1. Virtual Address và physical address
 
+Địa chỉ ảo (virtual address - vaddr) và địa chỉ thật (physical address - paddr) hay còn được gọi là địa chỉ vật lý, là hai phần địa chỉ mà hệ thống sử dụng, trong đó địa chỉ ảo dùng để sử dụng cho các tiến trình, bộ nhớ (stack/heap), application, v.v.. còn địa chỉ thật được sử dụng bởi ram vật lý, chúng tham chiếu địa chỉ thật và địa chỉ ảo bằng bảng trang (page table), khái niệm bảng trang có tại chương [7. Page Table, Physical Memory và TLB](#7-page-table-physical-memory-và-tlb)
+
 ### 1.2. `mmap()` là gì?
 
 ### 1.3. `munmap()` là gì?
