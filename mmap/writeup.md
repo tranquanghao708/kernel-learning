@@ -8,9 +8,10 @@
 
 - [1. Tổng quan về Memory Mapping](#1-tổng-quan-về-memory-mapping)
   - [1.1. Memory Mapping là gì?](#11-memory-mapping-là-gì)
-  - [1.2. mmap() là gì?](#12-mmap-là-gì)
-  - [1.3. munmap() là gì?](#13-munmap-là-gì)
-  - [1.4. Mối quan hệ giữa mmap() và munmap()](#14-mối-quan-hệ-giữa-mmap-và-munmap)
+	   - [1.1.1. Virtual Address và physical address](#111-virtual-address-và-physical-address)
+  - [1.2. `mmap()` là gì?](#12-mmap-là-gì)
+  - [1.3. `munmap()` là gì?](#13-munmap-là-gì)
+  - [1.4. Mối quan hệ giữa `mmap()` và `munmap()`](#14-mối-quan-hệ-giữa-mmap-và-munmap)
   - [1.5. Virtual Memory và Physical Memory](#15-virtual-memory-và-physical-memory)
   - [1.6. Vòng đời của một Memory Mapping](#16-vòng-đời-của-một-memory-mapping)
 
@@ -52,9 +53,6 @@
   - [5.7. Thiết lập quyền truy cập bộ nhớ](#57-thiết-lập-quyền-truy-cập-bộ-nhớ)
   - [5.8. Trả địa chỉ ánh xạ về User Space](#58-trả-địa-chỉ-ánh-xạ-về-user-space)
 
-</td>
-<td valign="top" width="50%">
-
 - [6. Cơ chế xử lý `munmap()` trong Kernel](#6-cơ-chế-xử-lý-munmap-trong-kernel)
   - [6.1. Điểm bắt đầu của system call](#61-điểm-bắt-đầu-của-system-call)
   - [6.2. Kiểm tra địa chỉ và phạm vi cần gỡ ánh xạ](#62-kiểm-tra-địa-chỉ-và-phạm-vi-cần-gỡ-ánh-xạ)
@@ -63,6 +61,9 @@
   - [6.5. Gỡ bỏ một phần VMA](#65-gỡ-bỏ-một-phần-vma)
   - [6.6. Chia tách VMA khi gỡ ánh xạ ở giữa](#66-chia-tách-vma-khi-gỡ-ánh-xạ-ở-giữa)
   - [6.7. Cập nhật cấu trúc quản lý địa chỉ ảo](#67-cập-nhật-cấu-trúc-quản-lý-địa-chỉ-ảo)
+
+</td>
+<td valign="top" width="50%">
 
 - [7. Page Table, Physical Memory và TLB](#7-page-table-physical-memory-và-tlb)
   - [7.1. Virtual Page và Physical Frame](#71-virtual-page-và-physical-frame)
@@ -127,8 +128,13 @@
 ---
 
 ## 1. Tổng quan về Memory Mapping
-
 ### 1.1. Memory Mapping là gì?
+
+Memory Mapping (ánh xạ bộ nhớ) là cơ chế thiết lập mối quan hệ giữa một vùng địa chỉ ảo trong không gian địa chỉ của tiến trình với một đối tượng hoặc tài nguyên mà tiến trình có thể truy cập thông qua vùng địa chỉ đó. Trên Linux, `mmap()` là một system-call interface cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ như vậy.
+
+Để hiểu bản chất của Memory Mapping, trước tiên ta cần phân biệt ba khái niệm: Virtual Address, Physical Address và Memory Mapping.
+
+#### 1.1.1. Virtual Address và physical address
 
 ### 1.2. `mmap()` là gì?
 
