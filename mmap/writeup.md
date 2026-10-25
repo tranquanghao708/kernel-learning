@@ -138,6 +138,52 @@ Memory Mapping (ánh xạ bộ nhớ) là cơ chế thiết lập mối quan h�
 
 Địa chỉ ảo (virtual address - vaddr) và địa chỉ thật (physical address - paddr) hay còn được gọi là địa chỉ vật lý, là hai phần địa chỉ mà hệ thống sử dụng, trong đó địa chỉ ảo dùng để sử dụng cho các tiến trình, bộ nhớ (stack/heap), application, v.v.. còn địa chỉ thật được sử dụng bởi ram vật lý, chúng tham chiếu địa chỉ thật và địa chỉ ảo bằng bảng trang (page table), khái niệm bảng trang có tại chương [7. Page Table, Physical Memory và TLB](#7-page-table-physical-memory-và-tlb)
 
+**Cho ví dụ**, khi chương trình C khai báo một biến `int number = 100;`. Biến number được đặt tại một địa chỉ trong không gian địa chỉ của tiến trình. Địa chỉ mà chương trình sử dụng thường là Virtual Address (địa chỉ ảo). Trong khi đó, dữ liệu có thể nằm trong RAM tại một địa chỉ vật lý, gọi là Physical Address (địa chỉ vật lý).
+
+Trên hệ thống sử dụng cơ chế phân trang, CPU phối hợp với phần cứng quản lý bộ nhớ (MMU) để dịch địa chỉ ảo sang địa chỉ vật lý thông qua các cấu trúc Page Table. Có thể hiểu như sau:
+
+```
+         User Space
+              │
+              ▼
+     Virtual Address
+       0x7f001000
+              │
+              ▼
+      ┌──────────────┐
+      │     MMU      │
+      │ Address      │
+      │ Translation  │
+      └──────────────┘
+              │
+              │ Tra cứu Page Table
+              ▼
+     Physical Address
+       0x12345000
+              │
+              ▼
+           RAM
+```
+
+Đây là sơ đồ minh họa đơn giản. Địa chỉ ví dụ không đại diện cho một ánh xạ thực tế cụ thể.
+
+> [!NOTE]
+> **Điểm cần nhớ:** chương trình sử dụng địa chỉ ảo, còn việc truy cập RAM được thực hiện thông qua cơ chế dịch địa chỉ của phần cứng.
+
+dựa vào đó, ta có thể nêu ra các điểm khác nhau để phân biệt hai khái niệm địa chỉ ảo và địa chỉ vật lý lẫn Memory Mapping (ánh xạ bộ nhớ) bằng hình thức trình bày bảng sau
+
+<div align="center">
+
+| Khái niệm | ý nghĩa |
+|-|-|
+| Memory Mapping | cơ chế thiết lập mối quan hệ giữa một vùng địa chỉ ảo trong không gian địa chỉ của tiến trình với một đối tượng hoặc tài nguyên mà tiến trình có thể truy cập thông qua vùng địa chỉ đó |
+| Virtual Address | Địa chỉ ảo thường dùng trong các phần mềm/ứng dụng, chương trình, tiến trình v.v. được ánh xạ với địa chỉ thật qua bảng trang (page table) |
+| Physical Address | Địa chỉ thật, thường nằm ở ram và được ánh xạ với địa chỉ ảo để dễ dàng truy cập các thông tin được ánh xạ với địa chỉ ảo qua bảng trang (page table) |
+
+</div>
+
+Thực tế, phần mềm ứng dụng ở hệ điều hành nó luôn nghĩ rằng là nó đang nắm giữ trọn vẹn địa chỉ thật của hệ thống máy tính, nhưng thực chất nó chỉ đang nắm giữ địa chỉ ảo thôi
+
 ### 1.2. `mmap()` là gì?
 
 ### 1.3. `munmap()` là gì?
