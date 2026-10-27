@@ -9,6 +9,7 @@
 - [1. Tổng quan về Memory Mapping](#1-tổng-quan-về-memory-mapping)
   - [1.1. Memory Mapping là gì?](#11-memory-mapping-là-gì)
 	   - [1.1.1. Virtual Address và physical address](#111-virtual-address-và-physical-address)
+	   - [1.1.3. Mối quan hệ giữa phần mềm và địa chỉ bộ nhớ](#113-mối-quan-hệ-giữa-phần-mềm-và-địa-chỉ-bộ-nhớ)
   - [1.2. `mmap()` là gì?](#12-mmap-là-gì)
   - [1.3. `munmap()` là gì?](#13-munmap-là-gì)
   - [1.4. Mối quan hệ giữa `mmap()` và `munmap()`](#14-mối-quan-hệ-giữa-mmap-và-munmap)
@@ -128,61 +129,96 @@
 ---
 
 ## 1. Tổng quan về Memory Mapping
+
 ### 1.1. Memory Mapping là gì?
 
-Memory Mapping (ánh xạ bộ nhớ) là cơ chế thiết lập mối quan hệ giữa một vùng địa chỉ ảo trong không gian địa chỉ của tiến trình với một đối tượng hoặc tài nguyên mà tiến trình có thể truy cập thông qua vùng địa chỉ đó. Trên Linux, `mmap()` là một system-call interface cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ như vậy.
+Memory Mapping (ánh xạ bộ nhớ) là cơ chế thiết lập mối quan hệ giữa một vùng địa chỉ ảo trong không gian địa chỉ của tiến trình với bộ nhớ hoặc một đối tượng được ánh xạ, chẳng hạn như một file. Nhờ cơ chế này, tiến trình có thể truy cập dữ liệu thông qua địa chỉ ảo mà không cần trực tiếp quản lý địa chỉ vật lý của RAM.
+
+Trên Linux, `mmap()` là một system-call interface cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ trong không gian địa chỉ ảo của tiến trình. Ngược lại, `munmap()` cho phép gỡ bỏ ánh xạ trong một phạm vi địa chỉ được chỉ định.
 
 Để hiểu bản chất của Memory Mapping, trước tiên ta cần phân biệt ba khái niệm: Virtual Address, Physical Address và Memory Mapping.
 
-#### 1.1.1. Virtual Address và physical address
+#### 1.1.1. Virtual Address và Physical Address
 
-Địa chỉ ảo (virtual address - vaddr) và địa chỉ thật (physical address - paddr) hay còn được gọi là địa chỉ vật lý, là hai phần địa chỉ mà hệ thống sử dụng, trong đó địa chỉ ảo dùng để sử dụng cho các tiến trình, bộ nhớ (stack/heap), application, v.v.. còn địa chỉ thật được sử dụng bởi ram vật lý, chúng tham chiếu địa chỉ thật và địa chỉ ảo bằng bảng trang (page table), khái niệm bảng trang có tại chương [7. Page Table, Physical Memory và TLB](#7-page-table-physical-memory-và-tlb)
+Địa chỉ ảo (Virtual Address - VA) và địa chỉ vật lý (Physical Address - PA) là hai loại địa chỉ được sử dụng trong cơ chế quản lý bộ nhớ của hệ thống máy tính.
 
-**Cho ví dụ**, khi chương trình C khai báo một biến `int number = 100;`. Biến number được đặt tại một địa chỉ trong không gian địa chỉ của tiến trình. Địa chỉ mà chương trình sử dụng thường là Virtual Address (địa chỉ ảo). Trong khi đó, dữ liệu có thể nằm trong RAM tại một địa chỉ vật lý, gọi là Physical Address (địa chỉ vật lý).
+**Virtual Address (VA)** là địa chỉ thuộc không gian địa chỉ ảo mà tiến trình sử dụng để truy cập bộ nhớ. Trên hệ điều hành hiện đại như Linux, mỗi tiến trình thông thường có không gian địa chỉ ảo riêng. Địa chỉ này được sử dụng để truy cập các vùng bộ nhớ như Stack, Heap, vùng dữ liệu và các vùng ánh xạ khác.
 
-Trên hệ thống sử dụng cơ chế phân trang, CPU phối hợp với phần cứng quản lý bộ nhớ (MMU) để dịch địa chỉ ảo sang địa chỉ vật lý thông qua các cấu trúc Page Table. Có thể hiểu như sau:
+**Physical Address (PA)** là địa chỉ thuộc không gian địa chỉ vật lý. Khi địa chỉ ảo được dịch thành công sang địa chỉ vật lý tương ứng, phần cứng có thể sử dụng địa chỉ vật lý đó để truy cập bộ nhớ vật lý, chẳng hạn như RAM.
 
+Trên hệ thống sử dụng cơ chế phân trang (Paging), CPU phối hợp với bộ phận quản lý bộ nhớ (Memory Management Unit - MMU) để dịch địa chỉ ảo sang địa chỉ vật lý thông qua các cấu trúc Page Table.
+
+Có thể hình dung quá trình này như sau:
+
+```text
+             User Space
+                 |
+                 v
+         Virtual Address
+           0x7f001000
+                 |
+                 v
+          +-------------+
+          |     MMU     |
+          |  Address    |
+          | Translation |
+          +-------------+
+                 |
+                 | Tra cứu Page Table
+                 v
+        Physical Address
+           0x12345000
+                 |
+                 v
+                RAM
 ```
-         User Space
-              │
-              ▼
-     Virtual Address
-       0x7f001000
-              │
-              ▼
-      ┌──────────────┐
-      │     MMU      │
-      │ Address      │
-      │ Translation  │
-      └──────────────┘
-              │
-              │ Tra cứu Page Table
-              ▼
-     Physical Address
-       0x12345000
-              │
-              ▼
-           RAM
-```
 
-Đây là sơ đồ minh họa đơn giản. Địa chỉ ví dụ không đại diện cho một ánh xạ thực tế cụ thể.
+Đây là sơ đồ minh họa đơn giản. Các địa chỉ trên chỉ mang tính ví dụ, không đại diện cho một ánh xạ thực tế cụ thể.
 
 > [!NOTE]
-> **Điểm cần nhớ:** chương trình sử dụng địa chỉ ảo, còn việc truy cập RAM được thực hiện thông qua cơ chế dịch địa chỉ của phần cứng.
+> **Điểm cần nhớ:** Chương trình thông thường sử dụng địa chỉ ảo. MMU và Page Table phối hợp để thực hiện quá trình dịch địa chỉ khi CPU truy cập bộ nhớ. Chương trình không cần trực tiếp biết địa chỉ vật lý tương ứng với địa chỉ ảo của mình.
 
-dựa vào đó, ta có thể nêu ra các điểm khác nhau để phân biệt hai khái niệm địa chỉ ảo và địa chỉ vật lý lẫn Memory Mapping (ánh xạ bộ nhớ) bằng hình thức trình bày bảng sau
+**Cho ví dụ**, khi chương trình C khai báo một biến:
+
+```c
+int number = 100;
+```
+
+Nếu biến được lưu trong bộ nhớ, địa chỉ lấy được thông qua `&number` trong chương trình thông thường là địa chỉ ảo thuộc không gian địa chỉ của tiến trình.
+
+```c
+printf("%p\n", (void *)&number);
+```
+
+Giá trị được in ra không phải địa chỉ vật lý của ô RAM đang chứa biến `number`. Nó là địa chỉ mà chương trình sử dụng để tham chiếu đến biến đó.
+
+Cần lưu ý rằng trình biên dịch có thể tối ưu biến vào thanh ghi hoặc loại bỏ việc lưu biến trong bộ nhớ nếu không cần thiết. Vì vậy, ví dụ trên chỉ minh họa trường hợp biến thực sự được lưu trong bộ nhớ.
+
+#### 1.1.2. Phân biệt Memory Mapping, Virtual Address và Physical Address
+
+Dựa trên các khái niệm đã trình bày, ta có thể phân biệt chúng như sau:
 
 <div align="center">
 
-| Khái niệm | ý nghĩa |
-|-|-|
-| Memory Mapping | cơ chế thiết lập mối quan hệ giữa một vùng địa chỉ ảo trong không gian địa chỉ của tiến trình với một đối tượng hoặc tài nguyên mà tiến trình có thể truy cập thông qua vùng địa chỉ đó |
-| Virtual Address | Địa chỉ ảo thường dùng trong các phần mềm/ứng dụng, chương trình, tiến trình v.v. được ánh xạ với địa chỉ thật qua bảng trang (page table) |
-| Physical Address | Địa chỉ thật, thường nằm ở ram và được ánh xạ với địa chỉ ảo để dễ dàng truy cập các thông tin được ánh xạ với địa chỉ ảo qua bảng trang (page table) |
+| Khái niệm | Bản chất | Vai trò |
+|---|---|---|
+| Memory Mapping | Cơ chế thiết lập quan hệ ánh xạ giữa một vùng địa chỉ ảo với bộ nhớ hoặc đối tượng được ánh xạ | Cho phép tiến trình truy cập bộ nhớ hoặc dữ liệu thông qua địa chỉ ảo |
+| Virtual Address (VA) | Địa chỉ thuộc không gian địa chỉ ảo của tiến trình | Được chương trình sử dụng để tham chiếu đến dữ liệu hoặc mã lệnh |
+| Physical Address (PA) | Địa chỉ thuộc không gian địa chỉ vật lý | Được sử dụng trong quá trình truy cập bộ nhớ vật lý sau khi địa chỉ được dịch thành công |
 
 </div>
 
-Thực tế, phần mềm ứng dụng ở hệ điều hành nó luôn nghĩ rằng là nó đang nắm giữ trọn vẹn địa chỉ thật của hệ thống máy tính, nhưng thực chất nó chỉ đang nắm giữ địa chỉ ảo thôi
+Memory Mapping và Virtual Address không phải hai cách gọi của cùng một khái niệm. Virtual Address là một loại địa chỉ, trong khi Memory Mapping là cơ chế thiết lập và quản lý quan hệ ánh xạ.
+
+Tương tự, Physical Address không phải bản thân RAM. Địa chỉ vật lý là địa chỉ trong không gian địa chỉ vật lý; RAM là một loại bộ nhớ vật lý mà hệ thống có thể truy cập thông qua cơ chế địa chỉ này.
+
+Trong hệ thống phân trang, quan hệ giữa địa chỉ ảo và địa chỉ vật lý được quản lý thông qua Page Table. Tuy nhiên, không phải mọi địa chỉ ảo đều luôn có một trang RAM vật lý tương ứng tại mọi thời điểm. Một vùng địa chỉ ảo có thể tồn tại mà các trang của nó chưa được cấp phát vật lý hoặc chưa có ánh xạ vật lý hiện hữu.
+
+#### 1.1.3. Mối quan hệ giữa phần mềm và địa chỉ bộ nhớ
+
+Trên các hệ điều hành hiện đại sử dụng bộ nhớ ảo, chương trình thông thường hoạt động dựa trên không gian địa chỉ ảo do hệ điều hành cung cấp. Điều này có nghĩa là chương trình không cần quản lý trực tiếp vị trí vật lý của dữ liệu trong RAM. Khi chương trình truy cập một địa chỉ ảo, phần cứng và hệ điều hành phối hợp để xử lý việc dịch địa chỉ, quản lý quyền truy cập và xử lý các trường hợp cần thiết như Page Fault.
+
+Vì vậy, không nên nói rằng phần mềm luôn nghĩ địa chỉ ảo chính là địa chỉ vật lý. Chính xác hơn, chương trình thông thường chỉ cần làm việc với địa chỉ trong không gian địa chỉ mà nó được cấp; việc ánh xạ sang địa chỉ vật lý được hệ thống quản lý phía dưới.Đây là một trong những nền tảng quan trọng của cơ chế Memory Mapping trên Linux.
 
 ### 1.2. `mmap()` là gì?
 
