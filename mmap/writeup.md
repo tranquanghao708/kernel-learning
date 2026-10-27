@@ -222,6 +222,13 @@ Vì vậy, không nên nói rằng phần mềm luôn nghĩ địa chỉ ảo ch
 
 ### 1.2. `mmap()` là gì?
 
+`mmap()` (memory mapping) là một API trên Linux cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ trong không gian địa chỉ ảo của tiến trình.
+
+Thông qua `mmap()`, chương trình có thể tạo vùng bộ nhớ ẩn danh (anonymous mapping), ánh xạ nội dung của file vào bộ nhớ, hoặc thiết lập vùng bộ nhớ phục vụ những mục đích khác.
+
+> [!IMPORTANT]
+> **Điểm quan trọng:** `mmap()` không đơn thuần là hàm cấp phát RAM. Nó yêu cầu kernel thiết lập một vùng địa chỉ ảo và các thông tin quản lý liên quan. Các trang vật lý có thể chỉ được cấp phát hoặc ánh xạ khi chương trình thực sự truy cập chúng.
+
 ### 1.3. `munmap()` là gì?
 
 ### 1.4. Mối quan hệ giữa `mmap()` và `munmap()`
