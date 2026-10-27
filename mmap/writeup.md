@@ -445,6 +445,33 @@ các kiểu dữ liệu quan trọng trong prototype:
 Từ bảng này, ta có thể nhóm tham số theo chức năng: vị trí và kích thước (`addr`, `length`), quyền truy cập (`prot`), loại ánh xạ (`flags`) và thông tin file (`fd`, `offset`).
 
 ### 2.3. `addr` và `length`
+
+tham số `addr` là địa chỉ ảo mà chương tình đề xuất làm địa chỉ bắt đầu của vùng ánh xạ. Ở đây, chúng ta có hai trường hợp:
+- **Trường hợp 1:** Là cung cấp vào cho tham số `addr` là `NULL`, ví dụ `mmap(NULL,...)` thì điều này chương trình sẽ cho kernel tùy chọn địa chỉ ảo phù hợp để bắt đầu của vùng ánh xạ mà ko có đề xuất gì hết
+- **Trường hợp 2:** Là cung cấp vào cho tham số `addr` là một địa chỉ ảo nào đó ví dụ `0xf000f123` như `mmap(0xf000f123,...)` thì điều này chương trình sẽ đề xuất địa chỉ `0xf000f123` cho kernel để làm địa chỉ ảo bắt đầu của vùng ánh xạ
+
+> [!IMPORTANT]
+> **Lưu ý:** địa chỉ `0xf000f123` chỉ thuộc dạng đề xuất, khi chương trình thực thi ko thể đảm bảo nó hoạt động, nghĩa là địa chỉ `0xf000f123` sẽ ko đảm bảo luôn là làm địa chỉ ảo bắt đầu của vùng ánh xạ. Vì kernel có thể chọn các địa chỉ khác
+
+Ví dụ minh họa, nếu dùng `NULL` truyền vào tham số `addr` thì kernel có thể trả về địa chỉ `0x7f100000`:
+
+```
+Không gian địa chỉ ảo của tiến trình
+
+0x7f0fffff  ───────────────
+0x7f100000  ┌──────────────┐  ◄── mem
+            │              │
+            │   Mapping    │
+            │              │
+0x7f100fff  └──────────────┘
+0x7f101000  ───────────────
+```
+
+Địa chỉ trên chỉ là ví dụ, không phải địa chỉ cố định mà `mmap()` luôn trả về. Còn về trường hợp 2 là trường hợp gắn một địa chỉ vào tham số `addr` để chương trình đề xuất thì trong cách sử dụng thông thường, địa chỉ được gán thẳng vào tham số `addr` chỉ là gợi ý cho kernel. Kernel có thể chọn địa chỉ khác nếu không thể sử dụng địa chỉ được đề xuất. Các cờ đặc biệt như `MAP_FIXED` và `MAP_FIXED_NOREPLACE` thay đổi cách xử lý địa chỉ này. Chúng có ngữ nghĩa riêng và cần được hiểu kỹ trước khi sử dụng.
+
+> [!NOTE]
+> **Điểm cần nhớ:** `addr` không phải địa chỉ vật lý của RAM. Đây là địa chỉ thuộc không gian địa chỉ ảo của tiến trình.
+
 ### 2.4. `prot` và quyền truy cập bộ nhớ
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
