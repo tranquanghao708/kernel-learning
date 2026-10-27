@@ -231,6 +231,10 @@ Thông qua `mmap()`, chương trình có thể tạo vùng bộ nhớ ẩn danh 
 
 ### 1.3. `munmap()` là gì?
 
+`munmap()` (memory unmapping) là một API linux tương tự `mmap()` nhưng vai trò của `munmap()` là gỡ bỏ ánh xạ trong phạm vi địa chỉ được chỉ định.
+
+Thông qua `munmap()` chương trình có thể đã gỡ bỏ ánh xạ tùy thuộc vào phạm vi được chỉ định. Sau khi `munmap()` thành công, chương trình không được tiếp tục truy cập vùng địa chỉ đã bị gỡ bỏ. Việc gỡ bỏ ánh xạ cũng không nhất thiết đồng nghĩa với việc toàn bộ tài nguyên vật lý liên quan lập tức được giải phóng, vì chúng có thể còn được tham chiếu ở nơi khác.
+
 ### 1.4. Mối quan hệ giữa `mmap()` và `munmap()`
 
 ### 1.5. Virtual Memory và Physical Memory
