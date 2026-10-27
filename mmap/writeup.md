@@ -15,7 +15,10 @@
   - [1.4. Mối quan hệ giữa `mmap()` và `munmap()`](#14-mối-quan-hệ-giữa-mmap-và-munmap)
   - [1.5. Virtual Memory và Physical Memory](#15-virtual-memory-và-physical-memory)
   - [1.6. Vòng đời của một Memory Mapping](#16-vòng-đời-của-một-memory-mapping)
-
+  	   - [1.6.1. Yêu cầu thiết lập ánh xạ](#161-yêu-cầu-thiết-lập-ánh-xạ)
+	   - [1.6.2. Kernel quản lý vùng địa chỉ ảo](#162-kernel-quản-lý-vùng-địa-chỉ-ảo)
+	   - [1.6.3. Chương trình truy cập vùng ánh xạ](#163-chương-trình-truy-cập-vùng-ánh-xạ)
+	   - [1.6.4. Gỡ bỏ ánh xạ](#164-gỡ-bỏ-ánh-xạ)
 - [2. Cơ chế hoạt động ở User Space](#2-cơ-chế-hoạt-động-ở-user-space)
   - [2.1. Khai báo và Prototype của `mmap()`](#21-khai-báo-và-prototype-của-mmap)
   - [2.2. Các tham số của `mmap()`](#22-các-tham-số-của-mmap)
@@ -222,21 +225,178 @@ Vì vậy, không nên nói rằng phần mềm luôn nghĩ địa chỉ ảo ch
 
 ### 1.2. `mmap()` là gì?
 
-`mmap()` (memory mapping) là một API trên Linux cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ trong không gian địa chỉ ảo của tiến trình.
+`mmap()` (*memory mapping*) là một API trên Linux cho phép chương trình yêu cầu kernel thiết lập một vùng ánh xạ trong không gian địa chỉ ảo của tiến trình.
 
-Thông qua `mmap()`, chương trình có thể tạo vùng bộ nhớ ẩn danh (anonymous mapping), ánh xạ nội dung của file vào bộ nhớ, hoặc thiết lập vùng bộ nhớ phục vụ những mục đích khác.
+Thông qua `mmap()`, chương trình có thể tạo vùng bộ nhớ ẩn danh (*anonymous mapping*), ánh xạ nội dung của file vào bộ nhớ (*file-backed mapping*), hoặc thiết lập vùng bộ nhớ phục vụ những mục đích khác.
 
 > [!IMPORTANT]
-> **Điểm quan trọng:** `mmap()` không đơn thuần là hàm cấp phát RAM. Nó yêu cầu kernel thiết lập một vùng địa chỉ ảo và các thông tin quản lý liên quan. Các trang vật lý có thể chỉ được cấp phát hoặc ánh xạ khi chương trình thực sự truy cập chúng.
+> **Điểm quan trọng:** `mmap()` không đơn thuần là hàm cấp phát RAM. Nó yêu cầu kernel thiết lập một vùng ánh xạ và các thông tin quản lý liên quan trong không gian địa chỉ ảo của tiến trình. Việc cấp phát hoặc ánh xạ các trang bộ nhớ vật lý có thể diễn ra sau đó, tùy thuộc vào loại ánh xạ và cách chương trình truy cập bộ nhớ.
+
+Ví dụ, khi chương trình yêu cầu ánh xạ 1 MiB bộ nhớ ẩn danh, kernel có thể thiết lập vùng địa chỉ ảo trước mà chưa cần cấp phát ngay toàn bộ các trang vật lý tương ứng.
+
+Khi chương trình truy cập một trang chưa có ánh xạ vật lý phù hợp, CPU có thể phát sinh *page fault*. Kernel sẽ xử lý tình huống này và quyết định cách cung cấp trang bộ nhớ phù hợp.
+
+> Cơ chế cấp phát hoặc đưa trang bộ nhớ vào RAM khi cần thiết có liên quan đến *demand paging* và *page fault*. Tuy nhiên, không phải mọi page fault đều có nghĩa là kernel phải cấp phát một trang RAM mới.
 
 ### 1.3. `munmap()` là gì?
 
-`munmap()` (memory unmapping) là một API linux tương tự `mmap()` nhưng vai trò của `munmap()` là gỡ bỏ ánh xạ trong phạm vi địa chỉ được chỉ định.
+`munmap()` (*memory unmapping*) là một API trên Linux cho phép chương trình yêu cầu kernel gỡ bỏ ánh xạ bộ nhớ trong một phạm vi địa chỉ ảo được chỉ định. Thông qua `munmap()`, chương trình có thể gỡ bỏ toàn bộ hoặc một phần của một vùng ánh xạ hiện có, miễn là các tham số đáp ứng yêu cầu của hệ thống.
 
-Thông qua `munmap()` chương trình có thể đã gỡ bỏ ánh xạ tùy thuộc vào phạm vi được chỉ định. Sau khi `munmap()` thành công, chương trình không được tiếp tục truy cập vùng địa chỉ đã bị gỡ bỏ. Việc gỡ bỏ ánh xạ cũng không nhất thiết đồng nghĩa với việc toàn bộ tài nguyên vật lý liên quan lập tức được giải phóng, vì chúng có thể còn được tham chiếu ở nơi khác.
+Sau khi `munmap()` thành công, phạm vi địa chỉ được gỡ bỏ không còn khả dụng thông qua ánh xạ đó. Nếu chương trình tiếp tục truy cập địa chỉ thuộc phạm vi đã gỡ bỏ, việc truy cập có thể gây ra lỗi truy cập bộ nhớ, chẳng hạn như `SIGSEGV`.
+
+Việc gỡ bỏ ánh xạ cũng không nhất thiết đồng nghĩa với việc toàn bộ tài nguyên vật lý liên quan lập tức được giải phóng. Các trang vật lý có thể vẫn được sử dụng hoặc tham chiếu bởi những ánh xạ hay thành phần khác của hệ thống.
 
 ### 1.4. Mối quan hệ giữa `mmap()` và `munmap()`
 
+Hai API này có vai trò đối ứng trong việc quản lý vòng đời của một vùng ánh xạ bộ nhớ.
+
+<div align="center">
+
+| `mmap()` | `munmap()` |
+|---|---|
+| Yêu cầu thiết lập vùng ánh xạ. | Yêu cầu gỡ bỏ ánh xạ trong phạm vi địa chỉ được chỉ định. |
+| Trả về địa chỉ bắt đầu của vùng ánh xạ khi thành công. | Trả về `0` khi thành công, hoặc `-1` khi thất bại. |
+| Cho phép chương trình sử dụng vùng địa chỉ ảo đã ánh xạ. | Làm cho phạm vi địa chỉ đã gỡ bỏ không còn khả dụng thông qua ánh xạ đó. |
+
+</div>
+
+Có thể hình dung mối quan hệ giữa hai API như sau:
+
+```text
+                 mmap()
+                   |
+                   v
+       +------------------------+
+       | Thiết lập vùng ánh xạ  |
+       | trong không gian VA    |
+       +------------------------+
+                   |
+                   v
+       +------------------------+
+       | Chương trình truy cập  |
+       | vùng địa chỉ đã ánh xạ |
+       +------------------------+
+                   |
+                   v
+                munmap()
+                   |
+                   v
+       +------------------------+
+       | Gỡ bỏ ánh xạ trong     |
+       | phạm vi được chỉ định  |
+       +------------------------+
+```
+
+**Lưu ý:** Sơ đồ trên mô tả vòng đời khái quát. Một vùng ánh xạ có thể bị gỡ bỏ một phần, và việc gỡ bỏ một mapping không nhất thiết giải phóng ngay toàn bộ các trang vật lý liên quan.
+
 ### 1.5. Virtual Memory và Physical Memory
 
+Để hiểu sâu hơn cách `mmap()` và `munmap()` hoạt động, cần phân biệt bộ nhớ ảo (*Virtual Memory*) với bộ nhớ vật lý (*Physical Memory*).
+
+**Virtual Memory** là cơ chế cung cấp cho tiến trình một không gian địa chỉ ảo. Chương trình sử dụng các địa chỉ trong không gian này để tham chiếu đến mã lệnh và dữ liệu.
+
+**Physical Memory** là bộ nhớ vật lý của hệ thống, thường được hiện thực bằng RAM. Khi CPU truy cập bộ nhớ, phần cứng quản lý bộ nhớ sử dụng các cấu trúc dịch địa chỉ để chuyển địa chỉ ảo thành địa chỉ vật lý phù hợp.
+
+Trên Linux, mỗi tiến trình thông thường có không gian địa chỉ ảo riêng. Kernel quản lý các vùng địa chỉ này và thiết lập các thuộc tính cần thiết để kiểm soát cách chương trình sử dụng chúng.
+
+Quá trình dịch địa chỉ có thể được mô tả khái quát như sau:
+
+```text
+             Tiến trình
+                  |
+                  v
+          Virtual Address
+                  |
+                  v
+         +----------------+
+         |      MMU       |
+         | Address        |
+         | Translation    |
+         +----------------+
+                  |
+                  | Tra cứu Page Table
+                  v
+          Physical Address
+                  |
+                  v
+                 RAM
+```
+
+Sơ đồ trên mô tả trường hợp địa chỉ ảo được dịch thành công sang địa chỉ vật lý. Trên thực tế, không phải mọi địa chỉ ảo thuộc một vùng đã được thiết lập đều luôn có trang vật lý tương ứng hiện diện trong RAM.
+
+Chẳng hạn, một vùng bộ nhớ ẩn danh được tạo bằng `mmap()` có thể tồn tại trong không gian địa chỉ ảo trước khi tất cả các trang của nó được cấp phát hoặc ánh xạ vật lý.
+
+Khi chương trình truy cập bộ nhớ, nếu việc truy cập cần đến một trang chưa có ánh xạ phù hợp, CPU có thể phát sinh *page fault*. Kernel xử lý lỗi trang dựa trên trạng thái của vùng nhớ, loại ánh xạ và các điều kiện liên quan.
+
+Vì vậy, cần phân biệt ba khái niệm:
+
+| Khái niệm | Vai trò |
+|---|---|
+| Virtual Memory | Cơ chế quản lý và cung cấp không gian địa chỉ ảo cho tiến trình. |
+| Physical Memory | Bộ nhớ vật lý mà hệ thống sử dụng để lưu trữ dữ liệu và mã lệnh khi cần. |
+| Memory Mapping | Cơ chế thiết lập mối quan hệ giữa vùng địa chỉ ảo với bộ nhớ hoặc đối tượng được ánh xạ. |
+
+Trong bối cảnh này, `mmap()` là API để chương trình yêu cầu kernel thiết lập một vùng ánh xạ, còn `munmap()` là API để yêu cầu gỡ bỏ ánh xạ đó trong một phạm vi nhất định.
+
 ### 1.6. Vòng đời của một Memory Mapping
+
+Một vùng ánh xạ bộ nhớ trên Linux có thể trải qua nhiều giai đoạn, từ lúc chương trình yêu cầu tạo mapping cho đến khi ánh xạ bị gỡ bỏ.
+
+#### 1.6.1. Yêu cầu thiết lập ánh xạ
+
+Chương trình gọi `mmap()` với các tham số xác định địa chỉ đề xuất, kích thước, quyền truy cập, loại ánh xạ và thông tin file nếu cần.
+
+Kernel kiểm tra các tham số và điều kiện liên quan. Nếu yêu cầu hợp lệ, kernel thiết lập vùng địa chỉ ảo tương ứng và trả về địa chỉ bắt đầu của vùng ánh xạ.
+
+#### 1.6.2. Kernel quản lý vùng địa chỉ ảo
+
+Kernel quản lý vùng địa chỉ này thông qua các cấu trúc dữ liệu bộ nhớ ảo. Trên Linux, `vm_area_struct` mô tả một vùng địa chỉ ảo có các thuộc tính quản lý liên quan; vùng này thường được gọi là VMA (*Virtual Memory Area*).
+
+Thông tin VMA có thể bao gồm phạm vi địa chỉ, quyền truy cập và các thông tin liên quan đến loại ánh xạ.
+
+Việc một VMA tồn tại không có nghĩa mọi trang trong phạm vi của nó đều đã được ánh xạ đến các trang vật lý trong RAM.
+
+#### 1.6.3. Chương trình truy cập vùng ánh xạ
+
+Sau khi `mmap()` thành công, chương trình có thể sử dụng địa chỉ được trả về để truy cập bộ nhớ, trong giới hạn quyền truy cập đã thiết lập.
+
+Tùy thuộc vào loại ánh xạ và trạng thái hiện tại, việc truy cập có thể sử dụng ánh xạ trang đã tồn tại hoặc phát sinh *page fault* để kernel xử lý.
+
+Ví dụ, với một vùng bộ nhớ ẩn danh, kernel có thể cung cấp trang vật lý khi chương trình lần đầu truy cập một trang chưa được cấp phát theo cơ chế của hệ thống.
+
+#### 1.6.4. Gỡ bỏ ánh xạ
+
+Khi không còn cần vùng bộ nhớ, chương trình có thể gọi `munmap()` để yêu cầu kernel gỡ bỏ ánh xạ trong phạm vi tương ứng.
+
+Kernel cập nhật các cấu trúc quản lý bộ nhớ và xử lý những ánh xạ trang liên quan. Nếu chỉ gỡ bỏ một phần của vùng ánh xạ, phần còn lại có thể tiếp tục tồn tại.
+
+Các trang vật lý liên quan chỉ được giải phóng khi không còn cần thiết và không còn được tham chiếu theo các cơ chế quản lý bộ nhớ của hệ thống.
+
+Có thể tóm tắt vòng đời như sau:
+
+```text
+        Chương trình gọi mmap()
+                  |
+                  v
+       Kernel thiết lập mapping
+                  |
+                  v
+       Vùng địa chỉ ảo tồn tại
+                  |
+                  v
+       Chương trình truy cập
+           vùng ánh xạ
+                  |
+                  v
+       Có thể phát sinh page fault
+           nếu cần xử lý trang
+                  |
+                  v
+       Chương trình gọi munmap()
+                  |
+                  v
+       Kernel gỡ bỏ ánh xạ
+       trong phạm vi yêu cầu
+```
+
+Vòng đời thực tế phụ thuộc vào loại ánh xạ, trạng thái các trang, việc chia sẻ tài nguyên và các hoạt động quản lý bộ nhớ khác. Vì vậy, không nên hiểu rằng mỗi lần gọi `mmap()` đều lập tức cấp phát RAM, hoặc mỗi lần gọi `munmap()` đều lập tức giải phóng toàn bộ RAM liên quan.
