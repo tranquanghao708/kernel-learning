@@ -498,7 +498,23 @@ Cách tính địa chỉ cuối của vùng có kích thước length là `last 
 
   Điều này không có nghĩa chương trình được phép tùy ý truy cập vượt quá phạm vi ánh xạ mà nó yêu cầu.
 
+`addr` và `length` là hai tham số có mối quan hệ mật thiết với nhau vì hai tham số này xác định phạm vi địa chỉ ảo mà chương trình muốn sử dụng. Tham số `addr` là đề xuất hoặc để kernel chọn nếu là `NULL` một địa chỉ ảo bắt đầu của vùng ánh xạ, tham số `length` là xác định kích thước vùng ánh xạ mà chương trình yêu cầu, tính bằng byte. Khi đầy đủ hai tham số này, ta có thể tính ra `last vaddr` (địa chỉ ảo kết thúc của vùng ánh xạ)
+
 ### 2.4. `prot` và quyền truy cập bộ nhớ
+
+tham số `prot` (protection) xác định các quyền truy cập mà một vùng bộ nhớ được phép có trong không gian địa chỉ ảo của tiến trình. Nói cách khác, prot cho biết CPU được phép đọc, ghi hoặc thực thi dữ liệu trong vùng bộ nhớ đó. Linux cung cấp các hằng số `prot` sau trong `<sys/mman.h>` :
+
+<div align="center">
+
+| Hằng số | Giá trị | Ý nghĩa |
+|---|---:|---|
+| `PROT_READ` | `0x1` | Cho phép đọc dữ liệu |
+| `PROT_WRITE` | `0x2` | Cho phép ghi dữ liệu |
+| `PROT_EXEC` | `0x4` | Cho phép thực thi lệnh máy |
+| `PROT_NONE` | `0x0` | Không cho phép truy cập thông thường |
+
+</div>
+
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
