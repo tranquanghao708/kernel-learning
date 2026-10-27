@@ -400,3 +400,55 @@ Có thể tóm tắt vòng đời như sau:
 ```
 
 Vòng đời thực tế phụ thuộc vào loại ánh xạ, trạng thái các trang, việc chia sẻ tài nguyên và các hoạt động quản lý bộ nhớ khác. Vì vậy, không nên hiểu rằng mỗi lần gọi `mmap()` đều lập tức cấp phát RAM, hoặc mỗi lần gọi `munmap()` đều lập tức giải phóng toàn bộ RAM liên quan.
+
+## 2. Cơ chế hoạt động ở User Space
+### 2.1. Khai báo và Prototype của `mmap()`
+
+Prototype của `mmap()` là các tiền tố, tham số khai báo của hàm `mmap()`:
+
+<p align="center">
+<img src="image/image0.png" alt="prototype mmap()">
+</p>
+
+các kiểu dữ liệu quan trọng trong prototype:
+
+<div align="center">
+
+| Thành phần | Ý nghĩa |
+|---|---|
+| `void *` | Kiểu con trỏ tổng quát; ở đây là kiểu giá trị trả về, dùng để biểu diễn địa chỉ bắt đầu của vùng ánh xạ. |
+| `size_t` | Kiểu số nguyên không dấu dùng để biểu diễn kích thước. |
+| `int` | Kiểu dữ liệu dùng cho các tham số `prot` và `flags`. |
+| `off_t` | Kiểu dữ liệu dùng để biểu diễn offset trong file. |
+
+</div>
+
+**Lưu ý:** `mmap()` là API được khai báo trong thư viện C trên Linux, lời gọi này thường được thực hiện thông qua system call tương ứng để yêu cầu kernel xử lý.
+
+### 2.2. Các tham số của `mmap()`
+
+`mmap()` bao gồm có 6 tham số, ta xét bảng sau :
+
+<div align="center">
+
+| Tham số | Chức năng |
+|---|---|
+| `addr` | Địa chỉ ảo đề xuất cho vùng ánh xạ. |
+| `length` | Kích thước vùng ánh xạ tính bằng byte. |
+| `prot` | Quy định các quyền truy cập bộ nhớ được yêu cầu. |
+| `flags` | Xác định loại ánh xạ và các thuộc tính liên quan. |
+| `fd` | File descriptor của đối tượng file cần ánh xạ, nếu có. |
+| `offset` | Vị trí bắt đầu trong file cần ánh xạ. |
+
+</div>
+
+Từ bảng này, ta có thể nhóm tham số theo chức năng: vị trí và kích thước (`addr`, `length`), quyền truy cập (`prot`), loại ánh xạ (`flags`) và thông tin file (`fd`, `offset`).
+
+### 2.3. `addr` và `length`
+### 2.4. `prot` và quyền truy cập bộ nhớ
+### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
+### 2.6. `fd` và `offset`
+### 2.7. Giá trị trả về và xử lý lỗi
+### 2.8. Khai báo và Prototype của `munmap()`
+### 2.9. Các tham số `addr` và `length` của `munmap()`
+### 2.10. Giá trị trả về và xử lý lỗi của `munmap()`
