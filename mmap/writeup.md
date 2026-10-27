@@ -472,6 +472,26 @@ Không gian địa chỉ ảo của tiến trình
 > [!NOTE]
 > **Điểm cần nhớ:** `addr` không phải địa chỉ vật lý của RAM. Đây là địa chỉ thuộc không gian địa chỉ ảo của tiến trình.
 
+Còn tham số `length` xác định kích thước vùng ánh xạ mà chương trình yêu cầu, tính bằng byte. **Ví dụ**, cho đoạn `mmap(NULL, 4069,...)`, trong đó tham số `addr` là `NULL` nên kernel sẽ chọn địa chỉ bắt đầu để ánh xạ, tham số `length` là `4069` tương đương `4` KiB
+
+vậy nghĩa của cái này trước tiên là yêu cầu ánh xạ một vùng có kích thước `4096` byte, tương đương `4` KiB. Giả sử kernel trả về địa chỉ bắt đầu 0x7f100000, vùng địa chỉ được yêu cầu có thể minh họa như sau:
+
+```
+Địa chỉ bắt đầu                       Địa chỉ cuối
+     0x7f100000                          0x7f100fff
+          │                                   │
+          ▼                                   ▼
+          ┌───────────────────────────────────┐
+          │                                   │
+          │       4096 bytes = 4 KiB          │
+          │                                   │
+          └───────────────────────────────────┘
+```
+
+Cách tính địa chỉ cuối của vùng có kích thước length là `last vaddr = addr + length - 1` vậy suy ra từ ví dụ trên, ta xét `0x7f100000 + 4096 - 1 = 0x7f100fff`
+
+**Lưu ý:** Đây là địa chỉ cuối của phạm vi byte được minh họa; trong C, thông thường người ta biểu diễn phạm vi bộ nhớ bằng khoảng nửa mở `[addr, addr + length)`. Nghĩa là địa chỉ bắt đầu được tính vào phạm vi, còn địa chỉ ngay sau vùng ánh xạ thì không.
+
 ### 2.4. `prot` và quyền truy cập bộ nhớ
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
