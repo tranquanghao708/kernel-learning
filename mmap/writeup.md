@@ -472,7 +472,7 @@ Không gian địa chỉ ảo của tiến trình
 > [!NOTE]
 > **Điểm cần nhớ:** `addr` không phải địa chỉ vật lý của RAM. Đây là địa chỉ thuộc không gian địa chỉ ảo của tiến trình.
 
-Còn tham số `length` xác định kích thước vùng ánh xạ mà chương trình yêu cầu, tính bằng byte. **Ví dụ**, cho đoạn `mmap(NULL, 4069,...)`, trong đó tham số `addr` là `NULL` nên kernel sẽ chọn địa chỉ bắt đầu để ánh xạ, tham số `length` là `4069` tương đương `4` KiB
+Còn tham số `length` xác định kích thước vùng ánh xạ mà chương trình yêu cầu, tính bằng byte. **Ví dụ**, cho đoạn `mmap(NULL, 4096,...)`, trong đó tham số `addr` là `NULL` nên kernel sẽ chọn địa chỉ bắt đầu để ánh xạ, tham số `length` là `4096` tương đương `4` KiB
 
 vậy nghĩa của cái này trước tiên là yêu cầu ánh xạ một vùng có kích thước `4096` byte, tương đương `4` KiB. Giả sử kernel trả về địa chỉ bắt đầu 0x7f100000, vùng địa chỉ được yêu cầu có thể minh họa như sau:
 
@@ -492,7 +492,11 @@ Cách tính địa chỉ cuối của vùng có kích thước length là `last 
 
 **Lưu ý:** Đây là địa chỉ cuối của phạm vi byte được minh họa; trong C, thông thường người ta biểu diễn phạm vi bộ nhớ bằng khoảng nửa mở `[addr, addr + length)`. Nghĩa là địa chỉ bắt đầu được tính vào phạm vi, còn địa chỉ ngay sau vùng ánh xạ thì không.
 
-- **`length` có bắt buộc là bội số của kích thước trang không?:** Không. `length` không nhất thiết phải là bội số của kích thước trang.
+- **`length` có bắt buộc là bội số của kích thước trang không?:** Không. `length` không nhất thiết phải là bội số của kích thước trang. **Ví dụ** cho đoạn code `size_t length = 1000;`
+
+  Chương trình có thể yêu cầu ánh xạ 1000 byte. Kernel quản lý ánh xạ theo các đơn vị trang và các quy tắc liên quan, nên phạm vi được quản lý có thể bao phủ nhiều byte hơn kích thước yêu cầu sau khi làm tròn theo ranh giới trang.
+
+  Điều này không có nghĩa chương trình được phép tùy ý truy cập vượt quá phạm vi ánh xạ mà nó yêu cầu.
 
 ### 2.4. `prot` và quyền truy cập bộ nhớ
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
