@@ -492,6 +492,8 @@ Cách tính địa chỉ cuối của vùng có kích thước length là `last 
 
 **Lưu ý:** Đây là địa chỉ cuối của phạm vi byte được minh họa; trong C, thông thường người ta biểu diễn phạm vi bộ nhớ bằng khoảng nửa mở `[addr, addr + length)`. Nghĩa là địa chỉ bắt đầu được tính vào phạm vi, còn địa chỉ ngay sau vùng ánh xạ thì không.
 
+- **`length` có bắt buộc là bội số của kích thước trang không?:** Không. `length` không nhất thiết phải là bội số của kích thước trang.
+
 ### 2.4. `prot` và quyền truy cập bộ nhớ
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
