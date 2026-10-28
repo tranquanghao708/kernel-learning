@@ -629,6 +629,9 @@ Bây giờ dùng `vmmap` ta thấy bắt đầu ở cái địa chỉ ảo của
 </details>
 
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
+
+Trong `mmap()`, tham số `flags` xác định cách kernel xử lý vùng bộ nhớ được ánh xạ, đặc biệt là cách vùng nhớ đó chia sẻ dữ liệu với các mapping khác và liệu nó có được liên kết với một file hay không.
+
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
 ### 2.8. Khai báo và Prototype của `munmap()`
