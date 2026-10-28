@@ -545,6 +545,29 @@ int value = *(int *)mem;
 
 Quá trình truy cập diễn ra như sau, đầu tiên là ghi dữ liệu `mov DWORD PTR [rax], 0x7b`, lúc này CPU ghi giá trị `123` vào địa chỉ ảo mà `RAX` đang giữ. Tiếp theo là đọc dữ liệu `mov eax, DWORD PTR [rax]`, CPU đọc 4 byte từ địa chỉ ảo đó vào thanh ghi `EAX`. Cả hai thao tác đều phù hợp với quyền `PROT_READ | PROT_WRITE`.
 
+- **Nếu quyền truy cập không phù hợp thì sao?:** Ví dụ, vùng bộ nhớ chỉ được cấp quyền đọc `PROT_READ`. Nếu chương trình cố ghi vào vùng này, CPU có thể phát sinh `page fault` do vi phạm quyền truy cập. Kernel xử lý ngoại lệ, nếu truy cập vẫn không hợp lệ, chương trình thường nhận `SIGSEGV`.
+
+  Tương tự, nếu vùng nhớ không có quyền `PROT_EXEC`, việc lấy lệnh máy từ vùng đó để thực thi thông thường sẽ bị ngăn chặn. Tuy nhiên, cần phân biệt hai trường hợp:
+  - **Page fault không đồng nghĩa với lỗi chương trình:** nó cũng có thể xảy ra khi CPU truy cập một trang chưa được đưa vào RAM và kernel có thể xử lý thành công.
+  - **Vi phạm quyền truy cập:** nếu thao tác không được phép và kernel không thể xử lý nó như một truy cập hợp lệ, tiến trình thường bị gửi SIGSEGV.
+
+<details>
+	<summary><b>[Thực hành]</b> Debug để bắt và phát hiện lỗi quyền truy cập ko phù hợp trong GDB</summary>
+<table>
+<tr>
+<td>
+
+---
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</td>
+</tr>
+</table>
+</details>
+
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
