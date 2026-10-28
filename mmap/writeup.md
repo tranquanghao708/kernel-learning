@@ -559,6 +559,66 @@ Quá trình truy cập diễn ra như sau, đầu tiên là ghi dữ liệu `mov
 
 ---
 
+Ta cho đoạn code sau :
+
+```c
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main(void)
+{
+   // size_t size = (size_t)sysconf(_SC_PAGESIZE);
+
+    void *mem = mmap(
+        NULL,
+        4096,
+        PROT_READ,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1,
+        0
+    );
+
+    if (mem == MAP_FAILED) {
+        perror("mmap");
+        return 1;
+    }
+
+    strcpy(mem, "Hello, Memory Mapping!"); //lỗi xãy ra tại đây, mem nó chỉ cho đọc nhưng lại ghi vậy điều này gây SIGSEGV
+
+    printf("Virtual address: %p\n", mem);
+    printf("Data: %s\n", (char *)mem);
+
+    munmap(mem, 4096);
+
+    return 0;
+}
+```
+
+> thưc chất đoạn code này cũng y chang như đoạn code trên, chỉ khác là cái ví dụ này ta gạt bỏ prot write đi chỉ giữ lại read thôi
+
+Ta phân tích trước, khi ta gạt bỏ `PROT_WRITE` rồi thì vùng ánh xạ 4KiB sẽ trở thành vùng chỉ có quyền đọc, nhưng chương trình đang thực hiện ghi vào vùng này bằng `strcpy` để truyền chuỗi `"Hello, Memory Mapping!`, nhưng nó chỉ cho đọc chứ ko cho ghi, vậy nên nó phạm vào vùng read-only thì khi chạy nó sẽ nhả ra `SIGSEGV` (truy cập địa chỉ ko hợp lệ)
+
+<p align="center">
+<img src="image/image1.png" alt="SIGSEGV do read only">
+</p>
+
+Bây giờ ta bật GDB, thử chạy `r` và khi đó GDB sẽ tiến hành bắt được đoạn hợp ngữ truy cập vào thanh ghi vùng nhớ chỉ đọc, là cái vùng ánh xạ của `mmap()`
+
+<p align="center">
+<img src="image/image2.png" alt="GDB debug">
+</p>
+
+Ta thấy hợp ngữ bị bắt được đang truy cập vào vùng ánh xạ chỉ đọc là `mov    qword ptr [rax], rsi ` với `rsi` là tham số chứa đoạn ascii của `Hello, M` là `0x4d202c6f6c6c6548` và thanh ghi này nó cố gắn đoạn này tương ứng gắn chuỗi vào vùng nhớ ánh xạ bắt đầu tại địa chỉ `0x7ffff7f8f000` (giá trị của `rax`) nên bị `sigsegv`
+
+<p align="center">
+<img src="image/image3.png" alt="GDB debug">
+</p>
+
+Bây giờ dùng `vmmap` ta thấy bắt đầu ở cái địa chỉ ảo của vùng ánh xạ, phần `r--p` nghĩa là chỉ `read-only` vậy nên bất kỳ cách thức thực thi hay ghi vào đều bị lỗi hết. Đây là một trong những kỹ năng debug rất quan trọng góp phần giúp xác định chương trình bị `SIGSEGV` khi làm việc với vùng nhớ
+
 <sub>--đã hết phần giải thích--</sub>
 
 ---
