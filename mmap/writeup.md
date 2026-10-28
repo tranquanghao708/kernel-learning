@@ -515,6 +515,11 @@ tham số `prot` (protection) xác định các quyền truy cập mà một vù
 
 </div>
 
+Các quyền này có thể kết hợp bằng toán tử bitwise OR (`|`). **Ví dụ**, `PROT_READ | PROT_WRITE` tương đương `0x1 | 0x2 = 0x3`, Vì vậy, `prot = 3` có nghĩa là vùng bộ nhớ được cấp quyền đọc và ghi.
+
+> [!NOTE]
+> **Lưu ý:** `PROT_NONE` có giá trị bằng `0`, nên không thể kết hợp nó với các quyền khác để tạo thành một tập quyền có ý nghĩa.
+
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
