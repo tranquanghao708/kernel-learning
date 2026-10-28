@@ -24,6 +24,7 @@
   - [2.2. Các tham số của `mmap()`](#22-các-tham-số-của-mmap)
   - [2.3. `addr` và `length`](#23-addr-và-length)
   - [2.4. `prot` và quyền truy cập bộ nhớ](#24-prot-và-quyền-truy-cập-bộ-nhớ)
+	   - [2.4.1. `prot` hoạt động như thế nào?](#241-prot-hoạt-động-như-thế-nào)
   - [2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`](#25-flags-map_private-map_shared-và-map_anonymous)
   - [2.6. `fd` và `offset`](#26-fd-và-offset)
   - [2.7. Giá trị trả về và xử lý lỗi](#27-giá-trị-trả-về-và-xử-lý-lỗi)
@@ -519,6 +520,30 @@ Các quyền này có thể kết hợp bằng toán tử bitwise OR (`|`). **V�
 
 > [!NOTE]
 > **Lưu ý:** `PROT_NONE` có giá trị bằng `0`, nên không thể kết hợp nó với các quyền khác để tạo thành một tập quyền có ý nghĩa.
+
+#### 2.4.1. `prot` hoạt động như thế nào?
+
+để hiểu cách `prot` hoạt động, trước hết ta cần xét lời gọi `mmap()` như sau:
+
+```c
+void *mem = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS,
+    -1,
+    0
+);
+```
+
+Ở đây ta có `PROT_READ | PROT_WRITE` là `prot` của lời gọi `mmap()`, nghĩa là khi cái hàm này nó cấp một vùng địa chỉ bắt đầu của vùng ánh xạ có kích thước 4KiB do kernel chỉ định, thì cái vùng ánh xạ đó nó được phép chế độ đọc-ghi. Giả sử `mmap()` trả về địa chỉ ảo `mem = 0x7ffff7f8f000`, sau đó, chương trình thực hiện:
+
+```c
+*(int *)mem = 123;
+int value = *(int *)mem;
+```
+
+Quá trình truy cập diễn ra như sau, đầu tiên là ghi dữ liệu `mov DWORD PTR [rax], 0x7b`, lúc này CPU ghi giá trị `123` vào địa chỉ ảo mà `RAX` đang giữ. Tiếp theo là đọc dữ liệu `mov eax, DWORD PTR [rax]`, CPU đọc 4 byte từ địa chỉ ảo đó vào thanh ghi `EAX`. Cả hai thao tác đều phù hợp với quyền `PROT_READ | PROT_WRITE`.
 
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 ### 2.6. `fd` và `offset`
