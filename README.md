@@ -13,9 +13,9 @@ Cuốn sách là kết quả đúc kết từ gần 25 năm kinh nghiệm giản
   
 </td>
 
-<td>
+<td length="10%>
 <kbd>
-<img src="OSTEP/logo.png" length="10%>
+<img src="OSTEP/logo.png">
 </kbd>
 </td>
 
