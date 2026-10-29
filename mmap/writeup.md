@@ -26,6 +26,10 @@
   - [2.4. `prot` và quyền truy cập bộ nhớ](#24-prot-và-quyền-truy-cập-bộ-nhớ)
 	   - [2.4.1. `prot` hoạt động như thế nào?](#241-prot-hoạt-động-như-thế-nào)
   - [2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`](#25-flags-map_private-map_shared-và-map_anonymous)
+	   - [2.5.1. `MAP_PRIVATE` — ánh xạ riêng tư](#251-mapprivate-—-ánh-xạ-riêng-tư)
+	   - [2.5.1.1 Copy-on-Write (COW)](#2511-copy-on-write-cow)
+	   - [2.5.2. MAP_SHARED — ánh xạ chia sẻ](#252-mapshared-—-ánh-xạ-chia-sẻ)
+	   - [2.5.3. MAP_ANONYMOUS — ánh xạ bộ nhớ ẩn danh](#253-mapanonymous-—-ánh-xạ-bộ-nhớ-ẩn-danh)
   - [2.6. `fd` và `offset`](#26-fd-và-offset)
   - [2.7. Giá trị trả về và xử lý lỗi](#27-giá-trị-trả-về-và-xử-lý-lỗi)
   - [2.8. Khai báo và Prototype của `munmap()`](#28-khai-báo-và-prototype-của-munmap)
@@ -630,7 +634,69 @@ Bây giờ dùng `vmmap` ta thấy bắt đầu ở cái địa chỉ ảo của
 
 ### 2.5. `flags`: `MAP_PRIVATE`, `MAP_SHARED` và `MAP_ANONYMOUS`
 
-Trong `mmap()`, tham số `flags` xác định cách kernel xử lý vùng bộ nhớ được ánh xạ, đặc biệt là cách vùng nhớ đó chia sẻ dữ liệu với các mapping khác và liệu nó có được liên kết với một file hay không.
+Trong `mmap()`, tham số `flags` xác định cách kernel xử lý vùng bộ nhớ được ánh xạ, đặc biệt là cách vùng nhớ đó chia sẻ dữ liệu với các mapping khác và liệu nó có được liên kết với một file hay không. Ba flag quan trọng là:
+- `MAP_PRIVATE`: ánh xạ riêng tư, các thay đổi không được ghi ngược vào file nguồn.
+- `MAP_SHARED`: ánh xạ chia sẻ, các thay đổi được chia sẻ với những mapping cùng đối tượng hỗ trợ chia sẻ.
+- `MAP_ANONYMOUS`: ánh xạ bộ nhớ ẩn danh, không lấy nội dung ban đầu từ file thông thường.
+
+#### 2.5.1. `MAP_PRIVATE` — ánh xạ riêng tư
+
+`MAP_PRIVATE` tạo một private mapping. Những thay đổi đối với vùng nhớ không được ghi ngược vào file được ánh xạ. **Ví dụ** xét đoạn C sau :
+
+```c
+void *mem = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE, // MAP_PRIVATE yêu cầu mapping có tính chất riêng tư.
+    fd,	 // nghĩa là bắt đầu ánh xạ từ byte đầu tiên của file.
+    0	// offset = 0 nghĩa là bắt đầu ánh xạ từ byte đầu tiên của file.
+);
+```
+
+Giả sử file ban đầu chứa `hello` khi chương trình sửa dữ liệu trong mapping thành `World` thì thay đổi đó không được ghi ngược vào file nguồn thông qua mapping này.
+
+> trong giải đáp câu hỏi này, có một ví dụ sẵn tiện giải thích luôn cơ chế `MAP_PRIVATE` khi ánh xạ vào file
+
+<details>
+	<summary><b>[Câu hỏi]</b> file nguồn trong trường hợp này là gì?</summary>
+<table>
+<tr>
+<td>
+
+---
+
+File nguồn là file trên hệ thống tệp mà `mmap()` sử dụng làm nguồn dữ liệu khi tạo một vùng nhớ ánh xạ (file-backed mapping). **Ví dụ**, giả sử ta có file `/home/crokson/data.txt` với nội dùng bên trong nó là :
+
+```
+Hello, linux
+```
+
+Ánh xạ file bằng `MAP_PRIVATE`, ta xét đoạn C sau :
+
+```c
+int fd = open("/home/crokson/data.txt", O_RDWR); //đây là đường dẫn đến file nguồn
+
+void *mem = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_PRIVATE, // yêu cầu các thay đổi qua mapping mang tính riêng tư.
+    fd, // là file descriptor đại diện cho file đang mở.
+    0 // offset = 0 là yêu cầu bắt đầu ánh xạ từ đầu file.
+);
+```
+
+Sau khi lệnh `mmap()` trên chạy xong và gắn vùng ánh xạ trong địa chỉ `*mem` thì giả sử ta ghi `World` vào vùng nhớ tương ứng với nội dung `Hello` như sau `memcpy(mem, "World", 5);` thì dữ liệu đọc qua mapping có thể thành `World, Linux!` nhưng nội dung ở file trên disk vẫn là `Hello, Linux!` đó là tác dụng chính của `MAP_PRIVATE`. Các thay đổi qua `MAP_PRIVATE` không được ghi ngược vào file nguồn.
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</td>
+</tr>
+</table>
+</details>
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
