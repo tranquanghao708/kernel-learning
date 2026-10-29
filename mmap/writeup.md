@@ -698,9 +698,71 @@ Sau khi lệnh `mmap()` trên chạy xong và gắn vùng ánh xạ trong địa
 </table>
 </details>
 
-##### 2.5.1.1 Copy-on-Write (COW)
+#### 2.5.1.1 Copy-on-Write (COW)
 
-Copy-on-Write (COW) là cơ chế sao chép khi ghi: nhiều bên có thể tạm thời dùng chung dữ liệu, và hệ điều hành chỉ tạo bản sao riêng khi có bên cần thay đổi dữ liệu đó. Mục đích chính là tránh sao chép dữ liệu không cần thiết, tiết kiệm bộ nhớ và giảm chi phí sao chép.
+Copy-on-Write (COW) là cơ chế sao chép khi ghi, nhiều bên có thể tạm thời dùng chung dữ liệu, và hệ điều hành chỉ tạo bản sao riêng khi có bên cần thay đổi dữ liệu đó. Mục đích chính là tránh sao chép dữ liệu không cần thiết, tiết kiệm bộ nhớ và giảm chi phí sao chép. Để hiểu COW trong `mmap()`, ta cần phân biệt ba thứ:
+- **Virtual Address (VA):** địa chỉ ảo mà chương trình sử dụng.
+- **Physical Page:** trang bộ nhớ vật lý chứa dữ liệu.
+- **Page Table:** cấu trúc giúp CPU dịch địa chỉ ảo sang địa chỉ vật lý, đồng thời áp dụng các quyền truy cập.
+
+> hai khái niệm physical page và page table được nêu chi tiết và rõ ràng tại chương [7.Page Table,Physical Memory và TLB](#7-page-table-physical-memory-và-tlb)
+
+Cách cow hoạt động. Giả sử hai mapping riêng tư cùng ánh xạ một file có nội dung:
+
+```
+File nguồn:
+┌──────────────────────┐
+│ "Hello, Linux!"      │
+└──────────────────────┘
+```
+
+Khi kernel có thể cho các mapping dùng chung trang dữ liệu ban đầu, trạng thái khái quát có thể như sau:
+
+```
+        Mapping A                 Mapping B
+     (địa chỉ ảo A)             (địa chỉ ảo B)
+            │                         │
+            └──────────┬──────────────┘
+                       │
+                       ▼
+              Trang vật lý P
+              ┌─────────────────┐
+              │ "Hello, Linux!" │
+              └─────────────────┘
+```
+
+Hai mapping có địa chỉ ảo riêng, nhưng có thể cùng tham chiếu đến một trang vật lý chứa dữ liệu ban đầu. Nếu cả hai mapping chỉ đọc dữ liệu, kernel không nhất thiết phải tạo thêm bản sao. Khi mapping A ghi dữ liệu, giả sử chương trình A thực hiện ghi dữ liệu bằng lệnh `memcpy(mem, "World", 5);`. Nếu đây là `MAP_PRIVATE` và trang đang được chia sẻ theo cơ chế COW, thao tác ghi có thể kích hoạt quá trình sau:
+- 1.CPU cố gắng ghi vào trang đang được bảo vệ để phục vụ COW.
+- 2.CPU phát sinh page fault.
+- 3.Kernel xác định rằng đây là trường hợp ghi hợp lệ cần thực hiện COW.
+- 4.Kernel cấp một trang vật lý riêng và sao chép nội dung trang cũ sang trang mới.
+- 5.Kernel cập nhật ánh xạ của A để trỏ đến trang riêng mới, với quyền truy cập phù hợp.
+- 6.CPU tiếp tục thực hiện thao tác ghi.
+Kết quả khái quát:
+
+```
+       Mapping A                 Mapping B
+           │                         │
+           ▼                         │
+    Trang vật lý P'                  │
+    ┌─────────────────┐              │
+    │ "World, Linux!" │              │
+    └─────────────────┘              │
+                                     ▼
+                            Trang vật lý P
+                            ┌─────────────────┐
+                            │ "Hello, Linux!" │
+                            └─────────────────┘
+```
+
+Sau đó:
+- A đọc được nội dung đã sửa.
+- B vẫn đọc được nội dung ban đầu.
+- Thay đổi riêng tư của A không được ghi ngược vào file nguồn thông qua mapping.
+Đây chính là ý nghĩa của Copy-on-Write: chỉ tạo bản sao khi cần ghi, thay vì sao chép ngay từ đầu.
+
+> [!NOTE]
+> **Lưu ý:** Đây là mô hình minh họa. COW chỉ diễn ra khi các điều kiện thực tế của mapping và trạng thái trang yêu cầu nó; không phải mọi lần ghi vào `MAP_PRIVATE` đều bắt buộc tạo một bản sao mới.
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
