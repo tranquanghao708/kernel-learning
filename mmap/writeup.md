@@ -698,6 +698,10 @@ Sau khi lệnh `mmap()` trên chạy xong và gắn vùng ánh xạ trong địa
 </table>
 </details>
 
+##### 2.5.1.1 Copy-on-Write (COW)
+
+Copy-on-Write (COW) là cơ chế sao chép khi ghi: nhiều bên có thể tạm thời dùng chung dữ liệu, và hệ điều hành chỉ tạo bản sao riêng khi có bên cần thay đổi dữ liệu đó. Mục đích chính là tránh sao chép dữ liệu không cần thiết, tiết kiệm bộ nhớ và giảm chi phí sao chép.
+
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
 ### 2.8. Khai báo và Prototype của `munmap()`
