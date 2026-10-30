@@ -782,6 +782,7 @@ Sau đó:
 	- khi chúng ta chưa thực hiện một lệnh ghi nội dung gì vào chẳng hạn như `memcpy(mem, "World", 5);` nhưng cũng chính lúc này kernel ko muốn sao chép toàn bộ file ngay từ đầu vì muốn tối ưu bộ nhớ, kernel giải quyết bằng cow :
     - Ban đầu cho mapping vùng ánh xạ với file (hoặc các mapping khác) dùng chung một trang vật lý và đánh dấu trang vật lý đó là read-only (hoặc protected) dù ta đã yêu cầu `PROT_WRITE`
 	- Khi chúng ta dùng lệnh `memcpy(mem, "World", 5);` nghĩa là thực sự ghi và thay thế `Hello` ở vùng chỉ đọc tại trang vật lý thành `World`, thì CPU sẽ phát sinh lỗi page fault, kernel nhận mã lỗi page fault này và kernel mới tạo bản sao riêng và khi đó vùng ánh xạ sẽ được cập nhật page table của process trỏ sang trang mới lúc này chúng ta mới được ghi
+- **Điều gì nếu ko có COW cho `MAP_PRIVATE`:** Nếu ko có cow cho `MAP_PRIVATE` thì kernel khi chạy xong lệnh `mmap()` nó sẽ sao chép luôn toàn bộ nội dung file ngay lập tức, điều này rất tốn thời gian và bộ nhớ dù chúng ta có thể sẽ ko bao giờ ghi. Với cow, nó chỉ thực hiện sao chép khi chúng ta ghi, còn nếu chạy `mmap()` mà vẫn chưa ghi thì nó cho vùng ánh xạ dùng chung một trang vật lý file (hoặc các mapping khác), nghĩa là thực sự sao chép khi chúng ta thực sự sử dụng nó
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
