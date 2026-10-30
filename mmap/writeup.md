@@ -783,6 +783,12 @@ Sau đó:
     - Ban đầu cho mapping vùng ánh xạ với file (hoặc các mapping khác) dùng chung một trang vật lý và đánh dấu trang vật lý đó là read-only (hoặc protected) dù ta đã yêu cầu `PROT_WRITE`
 	- Khi chúng ta dùng lệnh `memcpy(mem, "World", 5);` nghĩa là thực sự ghi và thay thế `Hello` ở vùng chỉ đọc tại trang vật lý thành `World`, thì CPU sẽ phát sinh lỗi page fault, kernel nhận mã lỗi page fault này và kernel mới tạo bản sao riêng và khi đó vùng ánh xạ sẽ được cập nhật page table của process trỏ sang trang mới lúc này chúng ta mới được ghi
 - **Điều gì nếu ko có COW cho `MAP_PRIVATE`:** Nếu ko có cow cho `MAP_PRIVATE` thì kernel khi chạy xong lệnh `mmap()` nó sẽ sao chép luôn toàn bộ nội dung file ngay lập tức, điều này rất tốn thời gian và bộ nhớ dù chúng ta có thể sẽ ko bao giờ ghi. Với cow, nó chỉ thực hiện sao chép khi chúng ta ghi, còn nếu chạy `mmap()` mà vẫn chưa ghi thì nó cho vùng ánh xạ dùng chung một trang vật lý file (hoặc các mapping khác), nghĩa là thực sự sao chép khi chúng ta thực sự sử dụng nó
+- **Nếu `prot` cho phép ghi, tại sao CPU không ghi trực tiếp lên trang đang được chia sẻ?:** Vì quyền ghi mà chương trình yêu cầu không đồng nghĩa với việc kernel phải cho phép ghi trực tiếp lên trang vật lý dùng chung. Trong trường hợp cần COW, kernel có thể thiết lập các quyền của trang trong Page Table để thao tác ghi ban đầu gây page fault. Sau khi xử lý COW, thao tác ghi được tiếp tục trên trang riêng của tiến trình.
+
+> [!IMPORTANT]
+> **Lưu ý quan trọng :** `MAP_PRIVATE` không bắt buộc luôn dùng COW (ví dụ nếu ta `mmap` với `PROT_READ` only thì không cần).
+>
+> Nhưng trong trường hợp phổ biến nhất (`PROT_READ | PROT_WRITE + MAP_PRIVATE`), COW chính là cách kernel thực hiện yêu cầu riêng tư của `MAP_PRIVATE`.
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
