@@ -761,8 +761,27 @@ Sau đó:
 - Thay đổi riêng tư của A không được ghi ngược vào file nguồn thông qua mapping.
 Đây chính là ý nghĩa của Copy-on-Write: chỉ tạo bản sao khi cần ghi, thay vì sao chép ngay từ đầu.
 
-> [!NOTE]
-> **Lưu ý:** Đây là mô hình minh họa. COW chỉ diễn ra khi các điều kiện thực tế của mapping và trạng thái trang yêu cầu nó; không phải mọi lần ghi vào `MAP_PRIVATE` đều bắt buộc tạo một bản sao mới.
+**Lưu ý:** Đây là mô hình minh họa. COW chỉ diễn ra khi các điều kiện thực tế của mapping và trạng thái trang yêu cầu nó; không phải mọi lần ghi vào `MAP_PRIVATE` đều bắt buộc tạo một bản sao mới.
+
+- **COW liên quan gì đến `MAP_PRIVATE`?:** vì cow là đảm nhiệm thực hiện sự riêng tư của `MAP_PRIVATE`, để hiểu việc này, ta xét lời gọi :
+
+  ```
+  int fd = open("/home/crokson/data.txt", O_RDWR); //đây là đường dẫn đến file nguồn
+
+  void *mem = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE, // Chế độ đọc và ghi
+    MAP_PRIVATE, // Quy định các thay đổi qua mapping có tính chất riêng tư
+    fd,
+    0
+  );
+  ```
+
+  Ở đây nó sẽ tạo một vùng ánh xạ có địa chỉ do kernel cung cấp và kích thước 4KiB, ánh xạ tới file `data.txt`. Bây giờ: 
+	- khi chúng ta chưa thực hiện một lệnh ghi nội dung gì vào chẳng hạn như `memcpy(mem, "World", 5);` nhưng cũng chính lúc này kernel ko muốn sao chép toàn bộ file ngay từ đầu vì muốn tối ưu bộ nhớ, kernel giải quyết bằng cow :
+    - Ban đầu cho mapping vùng ánh xạ với file (hoặc các mapping khác) dùng chung một trang vật lý và đánh dấu trang vật lý đó là read-only (hoặc protected) dù ta đã yêu cầu `PROT_WRITE`
+	- Khi chúng ta dùng lệnh `memcpy(mem, "World", 5);` nghĩa là thực sự ghi và thay thế `Hello` ở vùng chỉ đọc tại trang vật lý thành `World`, thì CPU sẽ phát sinh lỗi page fault, kernel nhận mã lỗi page fault này và kernel mới tạo bản sao riêng và khi đó vùng ánh xạ sẽ được cập nhật page table của process trỏ sang trang mới lúc này chúng ta mới được ghi
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
