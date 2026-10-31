@@ -363,21 +363,15 @@ Việc một VMA tồn tại không có nghĩa mọi trang trong phạm vi của
 
 #### 1.6.3. Chương trình truy cập vùng ánh xạ
 
-Sau khi `mmap()` thành công, chương trình có thể sử dụng địa chỉ được trả về để truy cập bộ nhớ, trong giới hạn quyền truy cập đã thiết lập.
-
-Tùy thuộc vào loại ánh xạ và trạng thái hiện tại, việc truy cập có thể sử dụng ánh xạ trang đã tồn tại hoặc phát sinh *page fault* để kernel xử lý.
+Sau khi `mmap()` thành công, chương trình có thể sử dụng địa chỉ được trả về để truy cập bộ nhớ, trong giới hạn quyền truy cập đã thiết lập. Tùy thuộc vào loại ánh xạ và trạng thái hiện tại, việc truy cập có thể sử dụng ánh xạ trang đã tồn tại hoặc phát sinh *page fault* để kernel xử lý.
 
 Ví dụ, với một vùng bộ nhớ ẩn danh, kernel có thể cung cấp trang vật lý khi chương trình lần đầu truy cập một trang chưa được cấp phát theo cơ chế của hệ thống.
 
 #### 1.6.4. Gỡ bỏ ánh xạ
 
-Khi không còn cần vùng bộ nhớ, chương trình có thể gọi `munmap()` để yêu cầu kernel gỡ bỏ ánh xạ trong phạm vi tương ứng.
+Khi không còn cần vùng bộ nhớ, chương trình có thể gọi `munmap()` để yêu cầu kernel gỡ bỏ ánh xạ trong phạm vi tương ứng. Kernel cập nhật các cấu trúc quản lý bộ nhớ và xử lý những ánh xạ trang liên quan. Nếu chỉ gỡ bỏ một phần của vùng ánh xạ, phần còn lại có thể tiếp tục tồn tại.
 
-Kernel cập nhật các cấu trúc quản lý bộ nhớ và xử lý những ánh xạ trang liên quan. Nếu chỉ gỡ bỏ một phần của vùng ánh xạ, phần còn lại có thể tiếp tục tồn tại.
-
-Các trang vật lý liên quan chỉ được giải phóng khi không còn cần thiết và không còn được tham chiếu theo các cơ chế quản lý bộ nhớ của hệ thống.
-
-Có thể tóm tắt vòng đời như sau:
+Các trang vật lý liên quan chỉ được giải phóng khi không còn cần thiết và không còn được tham chiếu theo các cơ chế quản lý bộ nhớ của hệ thống. Có thể tóm tắt vòng đời như sau:
 
 ```text
         Chương trình gọi mmap()
@@ -789,6 +783,12 @@ Sau đó:
 > **Lưu ý quan trọng :** `MAP_PRIVATE` không bắt buộc luôn dùng COW (ví dụ nếu ta `mmap` với `PROT_READ` only thì không cần).
 >
 > Nhưng trong trường hợp phổ biến nhất (`PROT_READ | PROT_WRITE + MAP_PRIVATE`), COW chính là cách kernel thực hiện yêu cầu riêng tư của `MAP_PRIVATE`.
+
+#### 2.5.2. MAP_SHARED — ánh xạ chia sẻ
+
+`MAP_SHARED` là một flag của `mmap()` cho phép các thay đổi thông qua mapping được chia sẻ với những mapping khác của cùng đối tượng được ánh xạ. Với file-backed mapping, các thay đổi đó còn có thể được ghi trở lại file nguồn. Để hiểu được cái này, ta cần phải hiểu và phân biệt thêm vùng nhớ ảo, trang nhớ vật lý và file nguồn.
+
+> File nguồn đã được giải thích tại phần câu hỏi của chương `MAP_PRIVATE`, vùng nhớ ảo và trang nhớ vật lý được nêu rõ tại chương [1.1.1. Virtual Address và physical address](#111-virtual-address-và-physical-address)
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
