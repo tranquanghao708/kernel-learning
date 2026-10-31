@@ -790,6 +790,24 @@ Sau đó:
 
 > File nguồn đã được giải thích tại phần câu hỏi của chương `MAP_PRIVATE`, vùng nhớ ảo và trang nhớ vật lý được nêu rõ tại chương [1.1.1. Virtual Address và physical address](#111-virtual-address-và-physical-address)
 
+Cách `MAP_SHARED` hoạt động. Giả sử ta có, file `/tmp/data.txt` có nội dung `hello`, tiến trình A ánh xạ file bằng cách dùng `MAP_SHARED`:
+
+```
+void *mem = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Sau khi `mmap()` thành công, `mem` trỏ đến vùng địa chỉ ảo tương ứng với mapping của file. Nếu tiến trình A thực hiện `strcpy(mem, "World");` thì nội dung trong mapping sẽ trở thành `World`. Với `MAP_SHARED`, thay đổi này có thể được quan sát qua một mapping tương thích khác của cùng file. Nội dung file cũng có thể được cập nhật thông qua cơ chế ghi lại dữ liệu của hệ điều hành.
+
+> [!NOTE]
+> **Lưu ý:** không nên giả định dữ liệu trên thiết bị lưu trữ được cập nhật ngay lập tức sau `strcpy()`. Kernel có thể giữ các trang đã sửa đổi trong page cache trước khi ghi chúng xuống thiết bị.
+
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
 ### 2.8. Khai báo và Prototype của `munmap()`
