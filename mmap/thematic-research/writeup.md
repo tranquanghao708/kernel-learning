@@ -158,25 +158,25 @@ Hệ thống tạo một vùng nhớ chung (shared memory region). Các process 
 | Phạm vi | Chỉ trong máy | Chỉ trong máy | Chỉ trong máy | Trong máy hoặc qua mạng |
 | Kiểu dữ liệu | Bộ nhớ thô (byte) | Byte stream | Byte stream | Stream hoặc Datagram |
 
-<div align="center">
+</div>
 
 Dựa vào bảng là tóm tắt, chúng ta phân tích chi tiết độ khác nhau giữa 4 cơ chế IPC :
 
-- 1. Shared Memory
+- 1.Shared Memory
   - **Ưu điểm:** Tốc độ cao nhất vì process đọc/ghi trực tiếp trên cùng vùng nhớ, không phải copy dữ liệu.
   - **Nhược điểm:** Không có cơ chế đồng bộ sẵn nên dễ bị race condition. Phải dùng thêm semaphore/mutex.
   - **Phù hợp:** Khi cần truyền dữ liệu lớn hoặc truy cập rất thường xuyên (xử lý ảnh, video, cache…).
-- 2. Pipe (Unnamed Pipe)
+- 2.Pipe (Unnamed Pipe)
   - Chỉ dùng được giữa các process có quan hệ (thường là cha – con).
   - Một chiều (một đầu đọc, một đầu ghi).
   - Đơn giản, an toàn hơn Shared Memory vì kernel quản lý buffer.
   - **Phù hợp:** Truyền dữ liệu đơn giản giữa process cha và con.
-- 3. FIFO (Named Pipe)
+- 3.FIFO (Named Pipe)
   - Giống Pipe nhưng có tên trong filesystem nên các process không liên quan vẫn dùng được.
   - Vẫn là byte stream, một chiều.
   - Tồn tại trên đĩa (thực ra là special file), nên có thể mở lại sau khi process kết thúc.
   - **Phù hợp:** Khi cần giao tiếp giữa các process độc lập trên cùng máy mà không muốn dùng Shared Memory.
-- 4. Socket
+- 4.Socket
   - **Linh hoạt nhất:** dùng được cả local (Unix Domain Socket) lẫn qua mạng (TCP/UDP).
   - Hai chiều, hỗ trợ tốt việc đồng bộ và điều khiển luồng.
   - Chi phí cao hơn vì phải qua nhiều lớp (đặc biệt khi dùng network).
