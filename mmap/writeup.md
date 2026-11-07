@@ -30,6 +30,7 @@
 	   - [2.5.1.1 Copy-on-Write (COW)](#2511-copy-on-write-cow)
 	   - [2.5.2. MAP_SHARED — ánh xạ chia sẻ](#252-mapshared-—-ánh-xạ-chia-sẻ)
 	   - [2.5.3. MAP_ANONYMOUS — ánh xạ bộ nhớ ẩn danh](#253-mapanonymous-—-ánh-xạ-bộ-nhớ-ẩn-danh)
+	   - [2.5.4. Khi nào dùng 3 cờ MAP?](#254-khi-nào-dùng-3-cờ-map?)
   - [2.6. `fd` và `offset`](#26-fd-và-offset)
   - [2.7. Giá trị trả về và xử lý lỗi](#27-giá-trị-trả-về-và-xử-lý-lỗi)
   - [2.8. Khai báo và Prototype của `munmap()`](#28-khai-báo-và-prototype-của-munmap)
@@ -807,6 +808,8 @@ Sau khi `mmap()` thành công, `mem` trỏ đến vùng địa chỉ ảo tươn
 
 > [!NOTE]
 > **Lưu ý:** không nên giả định dữ liệu trên thiết bị lưu trữ được cập nhật ngay lập tức sau `strcpy()`. Kernel có thể giữ các trang đã sửa đổi trong page cache trước khi ghi chúng xuống thiết bị.
+
+Shared có thể sử dụng rộng rãi và phổ biến với `fork()`, để sinh thêm tiến trình B. Ở đây, khi `mmap()` có chế độ này thì tiến trình con sẽ được thừa kế vùng ánh xạ. Nhưng để vùng ánh xạ này có thể truy cập được ở các tiến trình độc lập khác thì cần thêm các API như `shm_open()`, `ftruncate()` và `shm_unlink()` của POSIX shared memory
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
