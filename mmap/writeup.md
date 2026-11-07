@@ -811,7 +811,7 @@ Sau khi `mmap()` thành công, `mem` trỏ đến vùng địa chỉ ảo tươn
 
 Shared có thể sử dụng rộng rãi và phổ biến với `fork()`, để sinh thêm tiến trình B. Ở đây, khi `mmap()` có chế độ này thì tiến trình con sẽ được thừa kế vùng ánh xạ. Nhưng để vùng ánh xạ này có thể truy cập được ở các tiến trình độc lập khác thì cần thêm các API như `shm_open()`, `ftruncate()` và `shm_unlink()` của POSIX shared memory
 
-> Phần API này có tại [writeup chuyên đề MAP_SHARED](#https://github.com/tranquanghao708/kernel-learning/blob/main/mmap/thematic-research/writeup.md), chuyên đề của MAP_SHARED, nhưng nghiên cứu sâu độc lập kỹ chắc chắn sẽ lập riêng cho từng API
+> Phần API này có tại [writeup chuyên đề MAP_SHARED](https://github.com/tranquanghao708/kernel-learning/blob/main/mmap/thematic-research/writeup.md), chuyên đề của MAP_SHARED, nhưng nghiên cứu sâu độc lập kỹ chắc chắn sẽ lập riêng cho từng API
 
 ### 2.6. `fd` và `offset`
 ### 2.7. Giá trị trả về và xử lý lỗi
