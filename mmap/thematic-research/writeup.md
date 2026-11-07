@@ -1,6 +1,6 @@
 # Kernel : Chuyên đề MAP_SHARED (MAP_SHARED Thematic Research)
 
-**mục lục**
+**Mục lục**
 
 <table>
 <tr>
@@ -83,6 +83,7 @@
 ---
 
 ## 1.Tổng quan về POSIX Shared Memory
+
 ### 1.1. Shared Memory là gì?
 
 là một cơ chế Inter-Process Communication (IPC) cho phép nhiều tiến trình (process) cùng truy cập vào một vùng bộ nhớ chung. Đặc điểm chính
