@@ -11,8 +11,8 @@
   - [1.2. Shared Memory trong IPC](12-shared-memory-trong-ipc)
      - [1.2.1. IPC là gì?](#121-ipc-là-gì)
 	 - [1.2.2. Shared Memory hoạt động như thế nào?](#122-shared-memory-hoạt-động-như-thế-nào)
-  - 1.3. So sánh Shared Memory với Pipe, FIFO và Socket
-  - 1.4. POSIX Shared Memory và System V Shared Memory
+  - [1.3. So sánh Shared Memory với Pipe, FIFO và Socket](#13-so-sánh-shared-memory-với-pipe-fifo-và-socket)
+  - [1.4. POSIX Shared Memory và System V Shared Memory](#14-posix-shared-memory-và-system-v-shared-memory)
   - 1.5. Kiến trúc tổng thể giữa User Space và Kernel Space
 - 2.Shared Memory Object
   - 2.1. Shared Memory Object là gì?
@@ -63,11 +63,12 @@
   - 7.4. Trao đổi dữ liệu
   - 7.5. Đồng bộ hóa giữa các tiến trình
   - 7.6. Unlink và giải phóng tài nguyên
-- 8.Synchronization
+- 8.Đồng bộ hóa (Synchronization)
   - 8.1. Race Condition
-  - 8.2. POSIX Semaphore
-  - 8.3. Process-shared Mutex
-  - 8.4. Memory Ordering
+  - 8.2. Tín hiệu cờ POSIX (POSIX Semaphore)
+  - 8.3. Mutex dùng chung giữa các tiến trình (Process-shared Mutex)
+	 - 8.3.1. Mutex là gì?
+  - 8.4. Sắp xếp bộ nhớ (Memory Ordering)
   - 8.5. Đồng bộ hóa và tính nhất quán dữ liệu
 - 9.Thực nghiệm và Debugging
   - 9.1. Hai tiến trình độc lập sử dụng Shared Memory
@@ -140,3 +141,43 @@ Hệ thống tạo một vùng nhớ chung (shared memory region). Các process 
   - Cần xử lý cẩn thận việc tạo, xóa và quyền truy cập.
 
 ### 1.3. So sánh Shared Memory với Pipe, FIFO và Socket
+
+đây là bảng so sánh các cơ chế IPC phổ biến:
+
+<div align="center">
+
+| Tiêu chí | Shared Memory | Pipe (Unnamed) | FIFO (Named Pipe) | Socket |
+|-|-|-|-|-|
+| Tốc độ | Rất nhanh (nhanh nhất) | Trung bình | Trung bình | Chậm hơn (nhất là network) |
+| Sao chép dữ liệu | Không | Có (qua kernel) | Có (qua kernel) | Có (qua kernel) |
+| Hướng truyền | Hai chiều (tùy cách dùng) | Một chiều | Một chiều (thường) | Hai chiều |
+| Đồng bộ | Phải tự làm (semaphore…) | Kernel hỗ trợ một phần | Kernel hỗ trợ một phần | Kernel hỗ trợ tốt |
+| Process liên quan | Bất kỳ process nào | Thường là quan hệ cha-con | Bất kỳ process nào | Bất kỳ (kể cả khác máy) |
+| Tồn tại sau khi process kết thúc | Có (cần `shm_unlink`) | Không | Có (nằm trên filesystem) | Không |
+| Độ phức tạp lập trình | Cao | Thấp | Trung bình | Trung bình đến cao |
+| Phạm vi | Chỉ trong máy | Chỉ trong máy | Chỉ trong máy | Trong máy hoặc qua mạng |
+| Kiểu dữ liệu | Bộ nhớ thô (byte) | Byte stream | Byte stream | Stream hoặc Datagram |
+
+<div align="center">
+
+Dựa vào bảng là tóm tắt, chúng ta phân tích chi tiết độ khác nhau giữa 4 cơ chế IPC :
+
+- 1. Shared Memory
+  - **Ưu điểm:** Tốc độ cao nhất vì process đọc/ghi trực tiếp trên cùng vùng nhớ, không phải copy dữ liệu.
+  - **Nhược điểm:** Không có cơ chế đồng bộ sẵn nên dễ bị race condition. Phải dùng thêm semaphore/mutex.
+  - **Phù hợp:** Khi cần truyền dữ liệu lớn hoặc truy cập rất thường xuyên (xử lý ảnh, video, cache…).
+- 2. Pipe (Unnamed Pipe)
+  - Chỉ dùng được giữa các process có quan hệ (thường là cha – con).
+  - Một chiều (một đầu đọc, một đầu ghi).
+  - Đơn giản, an toàn hơn Shared Memory vì kernel quản lý buffer.
+  - **Phù hợp:** Truyền dữ liệu đơn giản giữa process cha và con.
+- 3. FIFO (Named Pipe)
+  - Giống Pipe nhưng có tên trong filesystem nên các process không liên quan vẫn dùng được.
+  - Vẫn là byte stream, một chiều.
+  - Tồn tại trên đĩa (thực ra là special file), nên có thể mở lại sau khi process kết thúc.
+  - **Phù hợp:** Khi cần giao tiếp giữa các process độc lập trên cùng máy mà không muốn dùng Shared Memory.
+- 4. Socket
+  - **Linh hoạt nhất:** dùng được cả local (Unix Domain Socket) lẫn qua mạng (TCP/UDP).
+  - Hai chiều, hỗ trợ tốt việc đồng bộ và điều khiển luồng.
+  - Chi phí cao hơn vì phải qua nhiều lớp (đặc biệt khi dùng network).
+  - **Phù hợp:** Khi cần giao tiếp phức tạp, hoặc giữa các máy khác nhau, hoặc muốn giao diện thống nhất (local + remote).
