@@ -8,7 +8,9 @@
 
 - [1.Tổng quan về POSIX Shared Memory](#1tổng-quan-về-posix-shared-memory)
   - [1.1. Shared Memory là gì?](#11-shared-memory-là-gì)
-  - 1.2. Shared Memory trong IPC
+  - [1.2. Shared Memory trong IPC](12-shared-memory-trong-ipc)
+     - [1.2.1. IPC là gì?](#121-ipc-là-gì)
+	 - [1.2.2. Shared Memory hoạt động như thế nào?](#122-shared-memory-hoạt-động-như-thế-nào)
   - 1.3. So sánh Shared Memory với Pipe, FIFO và Socket
   - 1.4. POSIX Shared Memory và System V Shared Memory
   - 1.5. Kiến trúc tổng thể giữa User Space và Kernel Space
@@ -104,3 +106,37 @@ Các hàm POSIX chính
 | `close()` | Đóng file descriptor |
 
 </div>
+
+### 1.2. Shared Memory trong IPC
+
+là một trong những cơ chế giao tiếp giữa các tiến trình (Inter-Process Communication) nhanh nhất.
+
+#### 1.2.1. IPC là gì?
+
+IPC (Inter-Process Communication) là tập hợp các kỹ thuật cho phép các process trao đổi dữ liệu và đồng bộ với nhau. Các cơ chế IPC phổ biến gồm:
+
+<div align="center">
+
+| Cơ chế | Tốc độ | Độ phức tạp | Sao chép dữ liệu | Ghi chú |
+|-|-|-|-|-|
+| Shared Memory | Rất nhanh | Trung bình | Không | Nhanh nhất |
+| Pipe / Named Pipe | Trung bình | Thấp | Có | Dễ dùng |
+| Message Queue | Trung bình | Trung bình | Có | Có cấu trúc |
+| Socket | Chậm hơn | Cao | Có | Có thể dùng mạng |
+| Signal | Nhanh | Thấp | Không | Chỉ thông báo |
+
+</div>
+
+#### 1.2.2. Shared Memory hoạt động như thế nào?
+
+Hệ thống tạo một vùng nhớ chung (shared memory region). Các process ánh xạ (map) vùng nhớ này vào không gian địa chỉ của riêng chúng. Sau đó chúng có thể đọc/ghi trực tiếp trên cùng một vùng nhớ từ đó không cần copy dữ liệu qua kernel.
+
+- **Ưu điểm**
+  - Tốc độ cao nhất trong các cơ chế IPC (không phải copy dữ liệu).
+  - Phù hợp khi cần truyền lượng dữ liệu lớn hoặc truy cập thường xuyên.
+- **Nhược điểm**
+  - **Không tự đồng bộ:** Dễ bị race condition nếu không dùng thêm cơ chế đồng bộ (semaphore, mutex, condition variable…).
+  - Khó quản lý hơn so với pipe hay message queue.
+  - Cần xử lý cẩn thận việc tạo, xóa và quyền truy cập.
+
+### 1.3. So sánh Shared Memory với Pipe, FIFO và Socket
