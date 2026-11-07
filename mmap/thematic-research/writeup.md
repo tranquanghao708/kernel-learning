@@ -6,8 +6,8 @@
 <tr>
 <td valign="top" width="50%">
 
-- 1.Tổng quan về POSIX Shared Memory
-  - 1.1. Shared Memory là gì?
+- [1.Tổng quan về POSIX Shared Memory](#1tổng-quan-về-posix-shared-memory)
+  - [1.1. Shared Memory là gì?](#11-shared-memory-là-gì)
   - 1.2. Shared Memory trong IPC
   - 1.3. So sánh Shared Memory với Pipe, FIFO và Socket
   - 1.4. POSIX Shared Memory và System V Shared Memory
@@ -81,3 +81,26 @@
 </talble>
 
 ---
+
+## 1.Tổng quan về POSIX Shared Memory
+### 1.1. Shared Memory là gì?
+
+là một cơ chế Inter-Process Communication (IPC) cho phép nhiều tiến trình (process) cùng truy cập vào một vùng bộ nhớ chung. Đặc điểm chính
+- Nó có tốc độ rất cao vì dữ liệu không cần copy qua kernel (khác với pipe, message queue…).
+- Các tiến trình đọc/ghi trực tiếp trên cùng một vùng nhớ.
+- Thường dùng kết hợp với cơ chế đồng bộ (semaphore, mutex, condition variable…) để tránh race condition.
+
+Các hàm POSIX chính
+
+<div align="center">
+
+| Hàm | Mục đích |
+|:-:|:-|
+| `shm_open()` | Tạo hoặc mở một shared memory object |
+| `ftruncate()` | Đặt kích thước cho shared memory |
+| `mmap()` | Ánh xạ shared memory vào không gian địa chỉ của process |
+| `munmap()` | Hủy ánh xạ |
+| `shm_unlink()` | Xóa shared memory object |
+| `close()` | Đóng file descriptor |
+
+</div>
