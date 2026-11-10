@@ -12,8 +12,10 @@
      - [1.2.1. IPC là gì?](#121-ipc-là-gì)
 	 - [1.2.2. Shared Memory hoạt động như thế nào?](#122-shared-memory-hoạt-động-như-thế-nào)
   - [1.3. So sánh Shared Memory với Pipe, FIFO và Socket](#13-so-sánh-shared-memory-với-pipe-fifo-và-socket)
-  - [1.4. POSIX Shared Memory và System V Shared Memory](#14-posix-shared-memory-và-system-v-shared-memory)
-  - 1.5. Kiến trúc tổng thể giữa User Space và Kernel Space
+  - [1.4. Kiến trúc tổng thể giữa User Space và Kernel Space](#14-kiến-trúc-tổng-thể-giữa-user-space-và-kernel-space)
+	 - 1.4.1. User Space và Kernel Space là gì?
+	 - 1.4.2. Vai trò của User Space trong POSIX Shared Memory
+	 - 1.4.3. Vai trò của Linux Kernel
 - 2.Shared Memory Object
   - 2.1. Shared Memory Object là gì?
   - 2.2. Namespace và tên đối tượng
@@ -181,3 +183,7 @@ Dựa vào bảng là tóm tắt, chúng ta phân tích chi tiết độ khác n
   - Hai chiều, hỗ trợ tốt việc đồng bộ và điều khiển luồng.
   - Chi phí cao hơn vì phải qua nhiều lớp (đặc biệt khi dùng network).
   - **Phù hợp:** Khi cần giao tiếp phức tạp, hoặc giữa các máy khác nhau, hoặc muốn giao diện thống nhất (local + remote).
+
+### 1.4. Kiến trúc tổng thể giữa User Space và Kernel Space
+
+Khái niệm user space là 
