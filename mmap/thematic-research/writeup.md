@@ -199,38 +199,65 @@ Trong kiến trúc POSIX Shared Memory trên Linux, User Space (không gian ngư
 
 Có thể hiểu rằng User Space chịu trách nhiệm đưa ra các yêu cầu và sử dụng vùng Shared Memory sau khi được ánh xạ thành công, trong khi Linux Kernel chịu trách nhiệm quản lý những tài nguyên hệ thống phía sau.
 
-Đầu tiên là chương trình ứng dụng (Application). Ở User Space, mọi hoạt động sử dụng POSIX Shared Memory đều bắt đầu từ chương trình ứng dụng. **Ví dụ**, một chương trình C có thể sử dụng các thư viện và header sau:
+- **a.Chương trình ứng dụng (Application):**Ở User Space, mọi hoạt động sử dụng POSIX Shared Memory đều bắt đầu từ chương trình ứng dụng. **Ví dụ**, một chương trình C có thể sử dụng các thư viện và header sau:
 
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-```
+  ```c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <fcntl.h>
+  #include <sys/mman.h>
+  #include <sys/stat.h>
+  #include <unistd.h>
+  ```
 
-Các header này cung cấp những khai báo cần thiết để chương trình sử dụng các API liên quan đến POSIX Shared Memory. Một quy trình sử dụng cơ bản:
+  Các header này cung cấp những khai báo cần thiết để chương trình sử dụng các API liên quan đến POSIX Shared Memory. Một quy trình sử dụng cơ bản:
 
-```c
-int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+  ```c
+  int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
 
-ftruncate(fd, 4096);
+  ftruncate(fd, 4096);
 
-void *ptr = mmap(
-    NULL,
-    4096,
-    PROT_READ | PROT_WRITE,
-    MAP_SHARED,
-    fd,
-    0
-);
-```
+  void *ptr = mmap(
+      NULL,
+      4096,
+      PROT_READ | PROT_WRITE,
+      MAP_SHARED,
+      fd,
+      0
+  );
+  ```
 
-Trong đoạn chương trình trên:
-- `shm_open()` yêu cầu tạo hoặc mở một Shared Memory Object và trả về file descriptor.
-- `ftruncate()` yêu cầu thiết lập kích thước object thành 4096 bytes.
-- `mmap()` yêu cầu ánh xạ object vào Virtual Address Space của tiến trình.
+  Trong đoạn chương trình trên:
+  - `shm_open()` yêu cầu tạo hoặc mở một Shared Memory Object và trả về file descriptor.
+  - `ftruncate()` yêu cầu thiết lập kích thước object thành 4096 bytes.
+  - `mmap()` yêu cầu ánh xạ object vào Virtual Address Space của tiến trình.
 
 > [!NOTE]
 > **Lưu ý:** Đây là ví dụ minh họa các thao tác API, chưa phải chương trình hoàn chỉnh vì chưa kiểm tra lỗi và giải phóng tài nguyên.
+
+- **b.thư viện C (C Library - glibc):** Các chương trình C thông thường không trực tiếp tự xây dựng cơ chế System Call cho từng thao tác. Thay vào đó, chúng sử dụng các hàm thư viện được cung cấp bởi C Library, chẳng hạn glibc trên Linux. **Ví dụ:**
+
+  ```c
+  shm_open();
+  ftruncate();
+  mmap();
+  munmap();
+  shm_unlink();
+  ```
+
+  Các API này cung cấp giao diện lập trình thuận tiện để ứng dụng tương tác với những cơ chế quản lý tài nguyên của Kernel.
+
+  **Một điểm cần phân biệt:** không nên mặc định rằng mỗi API tương ứng với đúng một System Call. Chẳng hạn, `shm_open()` trên Linux thường được triển khai thông qua các thao tác filesystem như `openat()`, chứ không nhất thiết có một System Call riêng mang tên `shm_open`.
+- **c. Quản lý File Descriptor:** Sau khi gọi `shm_open()` thành công, chương trình nhận được một giá trị int đại diện cho File Descriptor (FD). **Ví dụ:**
+
+  ```c
+  int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+  ```
+
+  Giá trị fd là một định danh mà tiến trình sử dụng để tham chiếu đến một file description do Kernel quản lý. File Descriptor cho phép chương trình thực hiện những thao tác tiếp theo trên Shared Memory Object, chẳng hạn:
+  - Thiết lập kích thước thông qua `ftruncate()`.
+  - Ánh xạ object thông qua `mmap()`.
+  - Đóng descriptor thông qua `close()`.
+
+> [!IMPORTANT]
+> Điều quan trọng là File Descriptor không phải địa chỉ bộ nhớ của Shared Memory. Nó chỉ là một định danh trong bảng File Descriptor của tiến trình.
