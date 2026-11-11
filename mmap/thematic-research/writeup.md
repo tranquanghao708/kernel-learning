@@ -13,8 +13,8 @@
 	 - [1.2.2. Shared Memory hoạt động như thế nào?](#122-shared-memory-hoạt-động-như-thế-nào)
   - [1.3. So sánh Shared Memory với Pipe, FIFO và Socket](#13-so-sánh-shared-memory-với-pipe-fifo-và-socket)
   - [1.4. Kiến trúc tổng thể giữa User Space và Kernel Space](#14-kiến-trúc-tổng-thể-giữa-user-space-và-kernel-space)
-	 - 1.4.1. User Space và Kernel Space là gì?
-	 - 1.4.2. Vai trò của User Space trong POSIX Shared Memory
+	 - [1.4.1. User Space và Kernel Space là gì?](#141-user-space-và-kernel-space-là-gì)
+	 - [1.4.2. Vai trò của User Space trong POSIX Shared Memory](#142-vai-trò-của-user-space-trong-posix-shared-memory)
 	 - 1.4.3. Vai trò của Linux Kernel
 - 2.Shared Memory Object
   - 2.1. Shared Memory Object là gì?
@@ -192,3 +192,45 @@ Khái niệm user space (hay còn gọi là userland) là không gian mà các c
 Khái niệm kernel space (ko gian nhãn) là vùng bộ nhớ và môi trường thực thi dành riêng cho nhân hệ điều hành (kernel). Đây là không gian có đặc quyền cao nhất (privileged mode / ring 0), có quyền truy cập toàn bộ phần cứng: (CPU, RAM, ổ đĩa, card mạng, GPU...) Quản lý tài nguyên hệ thống: bộ nhớ, tiến trình, file system, driver thiết bị, bảo mật…
 
 Code trong kernel space nếu bị lỗi thường làm sập cả hệ thống (kernel panic / BSOD). Chỉ kernel và các module/driver được tải vào kernel mới chạy ở đây.
+
+#### 1.4.2. Vai trò của User Space trong POSIX Shared Memory
+
+Trong kiến trúc POSIX Shared Memory trên Linux, User Space (không gian người dùng) là môi trường thực thi các chương trình ứng dụng có nhu cầu sử dụng cơ chế chia sẻ bộ nhớ giữa nhiều tiến trình (Inter-Process Communication - IPC).Tại đây, chương trình không trực tiếp quản lý Physical Memory hay Page Table của hệ thống. Thay vào đó, nó sử dụng các giao diện lập trình (API) do POSIX cung cấp để yêu cầu Kernel thực hiện những thao tác liên quan đến việc tạo, quản lý và ánh xạ vùng bộ nhớ dùng chung.
+
+Có thể hiểu rằng User Space chịu trách nhiệm đưa ra các yêu cầu và sử dụng vùng Shared Memory sau khi được ánh xạ thành công, trong khi Linux Kernel chịu trách nhiệm quản lý những tài nguyên hệ thống phía sau.
+
+Đầu tiên là chương trình ứng dụng (Application). Ở User Space, mọi hoạt động sử dụng POSIX Shared Memory đều bắt đầu từ chương trình ứng dụng. **Ví dụ**, một chương trình C có thể sử dụng các thư viện và header sau:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+```
+
+Các header này cung cấp những khai báo cần thiết để chương trình sử dụng các API liên quan đến POSIX Shared Memory. Một quy trình sử dụng cơ bản:
+
+```c
+int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+
+ftruncate(fd, 4096);
+
+void *ptr = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Trong đoạn chương trình trên:
+- `shm_open()` yêu cầu tạo hoặc mở một Shared Memory Object và trả về file descriptor.
+- `ftruncate()` yêu cầu thiết lập kích thước object thành 4096 bytes.
+- `mmap()` yêu cầu ánh xạ object vào Virtual Address Space của tiến trình.
+
+> [!NOTE]
+> **Lưu ý:** Đây là ví dụ minh họa các thao tác API, chưa phải chương trình hoàn chỉnh vì chưa kiểm tra lỗi và giải phóng tài nguyên.
