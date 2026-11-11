@@ -199,7 +199,7 @@ Trong kiến trúc POSIX Shared Memory trên Linux, User Space (không gian ngư
 
 Có thể hiểu rằng User Space chịu trách nhiệm đưa ra các yêu cầu và sử dụng vùng Shared Memory sau khi được ánh xạ thành công, trong khi Linux Kernel chịu trách nhiệm quản lý những tài nguyên hệ thống phía sau.
 
-- **a.Chương trình ứng dụng (Application):**Ở User Space, mọi hoạt động sử dụng POSIX Shared Memory đều bắt đầu từ chương trình ứng dụng. **Ví dụ**, một chương trình C có thể sử dụng các thư viện và header sau:
+- **a.Chương trình ứng dụng (Application):** Ở User Space, mọi hoạt động sử dụng POSIX Shared Memory đều bắt đầu từ chương trình ứng dụng. **Ví dụ**, một chương trình C có thể sử dụng các thư viện và header sau:
 
   ```c
   #include <stdio.h>
@@ -261,3 +261,29 @@ Có thể hiểu rằng User Space chịu trách nhiệm đưa ra các yêu cầ
 
 > [!IMPORTANT]
 > Điều quan trọng là File Descriptor không phải địa chỉ bộ nhớ của Shared Memory. Nó chỉ là một định danh trong bảng File Descriptor của tiến trình.
+
+- **d. Sử dụng Shared Memory sau khi Mapping:** Sau khi `mmap()` thành công, chương trình nhận được một Virtual Address trỏ đến vùng nhớ đã ánh xạ. **Ví dụ:**
+
+  ```c
+  char *ptr = mmap(
+      NULL,
+      4096,
+      PROT_READ | PROT_WRITE,
+      MAP_SHARED,
+      fd,
+      0
+  );
+  
+  if (ptr == MAP_FAILED) {
+      perror("mmap");
+      exit(EXIT_FAILURE);
+  }
+
+  ptr[0] = 'A';
+  ptr[1] = 'B';
+  ```
+
+  Ở đây, `ptr` là một địa chỉ Virtual Address thuộc không gian địa chỉ của tiến trình hiện tại. Khi chương trình thực hiện `ptr[0] = 'A';`, CPU thực hiện thao tác ghi bộ nhớ thông qua cơ chế dịch địa chỉ Virtual Address sang Physical Address. Nếu trang bộ nhớ tương ứng đã được ánh xạ và truy cập hợp lệ, CPU có thể ghi trực tiếp vào Physical Page tương ứng mà không cần thực hiện một System Call riêng cho mỗi lần ghi.
+
+> [!IMPORTANT]
+> **Đây là điểm rất quan trọng:** System Call được sử dụng để thiết lập mapping, nhưng các thao tác đọc/ghi dữ liệu thông thường sau đó diễn ra trực tiếp thông qua cơ chế truy cập bộ nhớ của CPU.
