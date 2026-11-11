@@ -15,7 +15,7 @@
   - [1.4. Kiến trúc tổng thể giữa User Space và Kernel Space](#14-kiến-trúc-tổng-thể-giữa-user-space-và-kernel-space)
 	 - [1.4.1. User Space và Kernel Space là gì?](#141-user-space-và-kernel-space-là-gì)
 	 - [1.4.2. Vai trò của User Space trong POSIX Shared Memory](#142-vai-trò-của-user-space-trong-posix-shared-memory)
-	 - 1.4.3. Vai trò của Linux Kernel
+	 - [1.4.3. Vai trò của Linux Kernel](#143-vai-trò-của-linux-kernel)
 - 2.Shared Memory Object
   - 2.1. Shared Memory Object là gì?
   - 2.2. Namespace và tên đối tượng
@@ -287,3 +287,16 @@ Có thể hiểu rằng User Space chịu trách nhiệm đưa ra các yêu cầ
 
 > [!IMPORTANT]
 > **Đây là điểm rất quan trọng:** System Call được sử dụng để thiết lập mapping, nhưng các thao tác đọc/ghi dữ liệu thông thường sau đó diễn ra trực tiếp thông qua cơ chế truy cập bộ nhớ của CPU.
+
+- **e. Trách nhiệm của User Space:** Tổng hợp lại, User Space chịu trách nhiệm:
+  - **Application:** Quyết định cách sử dụng Shared Memory
+  - **POSIX API:** Cung cấp giao diện thao tác với Shared Memory
+  - **C Library:** Cung cấp implementation của API
+  - **File Descriptor:** Tham chiếu đến object được Kernel quản lý
+  - **Virtual Address:** Địa chỉ để chương trình truy cập vùng mapping
+  - **Synchronization:** Tổ chức đồng bộ giữa các process
+  - **Error Handling:** Kiểm tra và xử lý lỗi từ các API
+
+User Space không trực tiếp quản lý cách Kernel cấp phát Physical Pages, thiết lập Page Table hay quản lý VMA. Nó chỉ tương tác với những tài nguyên này thông qua các giao diện được hệ điều hành cung cấp.Sau khi mapping thành công, chương trình có thể truy cập dữ liệu thông qua Virtual Address như cách nó truy cập một vùng bộ nhớ thông thường. Chính cơ chế này cho phép nhiều tiến trình độc lập cùng thao tác trên một vùng Physical Memory được chia sẻ.
+
+#### 1.4.3. Vai trò của Linux Kernel
