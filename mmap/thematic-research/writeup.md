@@ -311,4 +311,38 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
    int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
   ```
 
-  Ở mức triển khai Linux, tên `/my_shm` thường tương ứng với một đối tượng filesystem có tên my_shm bên trong `/dev/shm`.
+  Ở mức triển khai Linux, tên `/my_shm` thường tương ứng với một đối tượng filesystem có tên `my_shm` bên trong `/dev/shm`. Kernel chịu trách nhiệm:
+  - Tra cứu tên object trong namespace tương ứng.
+  - Kiểm tra quyền truy cập.
+  - Tạo mới hoặc mở object đã tồn tại.
+  - Quản lý metadata của object.
+  - Duy trì các tham chiếu đến object trong suốt vòng đời sử dụng.
+  Cần phân biệt rằng Shared Memory Object không đơn giản là một vùng địa chỉ Virtual Memory. Nó là một đối tượng được quản lý bởi Kernel, có thể được nhiều tiến trình mở và ánh xạ vào không gian địa chỉ riêng của chúng.
+
+<details>
+	<summary><b>[Câu hỏi]</b> /dev/shm là gì ở linux?</summary>
+<table>
+<tr>
+<td>
+
+---
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</td>
+</tr>
+</table>
+
+- **b. Quản lý File Descriptor và Open File Description:** Sau khi `shm_open()` thành công, Kernel trả về một File Descriptor cho tiến trình gọi. **Ví dụ:**
+
+  ```c
+  int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+  ```
+
+  Giá trị fd được sử dụng làm chỉ mục trong File Descriptor Table của tiến trình. Ở cấp độ kernel, có thể hình dung mô hình mối quan hệ như sau:
+
+  <p align="center">
+	<img src="image/image0.png" alt="mô hình mối quan hệ">
+  </p>
