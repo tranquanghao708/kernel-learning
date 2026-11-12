@@ -334,7 +334,7 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
 
 Điều này tạo ra mối liên hệ trực tiếp giữa POSIX Shared Memory API và cơ chế filesystem của Linux.
 
-- **/dev/shm nằm ở đâu trong linux?:** Trên Linux, /dev/shm là một đường dẫn thuộc filesystem hierarchy (Cấu trúc phân cấp hệ thống tệp). **Ví dụ:**
+- **`/dev/shm` nằm ở đâu trong linux?:** Trên Linux, /dev/shm là một đường dẫn thuộc filesystem hierarchy (Cấu trúc phân cấp hệ thống tệp). **Ví dụ:**
 
   ```bash
   $ ls -ld /dev/shm
@@ -362,6 +362,41 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
   - `nodev`: Không cho phép sử dụng device special files
 
   **Lưu ý:** `tmpfs` không phải một phân vùng ổ đĩa vật lý. Nó sử dụng cơ chế quản lý bộ nhớ của Kernel và có thể sử dụng swap khi cần.
+
+<details>
+<summary><b>[Chi tiết]</b> Thử với hệ thống thật</summary>
+
+---
+
+Kết quả:
+
+<p align="center">
+<img src="image/image0.png" alt="mô hình mối quan hệ">
+</p>
+
+Ở đây ta thấy 
+
+```bash
+TARGET   SOURCE FSTYPE OPTIONS
+/dev/shm tmpfs  tmpfs  rw,nosuid,nodev,inode64,huge=advise,usrquota
+```
+
+Phần options, nó có nghĩa là :
+
+- `rw`: Mount ở chế độ read-write (đọc + ghi được).
+- `nosuid`: Không cho phép các bit SUID/SGID có hiệu lực trên filesystem này. (An toàn hơn, tránh privilege escalation)
+- `nodev`: Không cho phép sử dụng device file (character/block device) trên filesystem này.
+- `inode64`: Sử dụng 64-bit inode number. Tránh bị giới hạn số lượng inode khi filesystem rất lớn (mặc dù `/dev/shm` là `tmpfs`).
+- `huge=advise`: Liên quan đến Transparent Huge Pages (THP). Chế độ `advise` nghĩa là kernel sẽ cố gắng dùng huge page nếu có thể, nhưng không bắt buộc.
+- `usrquota`: Bật user quota (giới hạn dung lượng theo từng user).
+
+Suy ra, đây là cấu hình mount khá an toàn và phổ biến của `/dev/shm` (`tmpfs` trên RAM). Cho phép đọc/ghi , tắt SUID và device file (bảo mật), hỗ trợ inode 64-bit, có bật Transparent Huge Pages ở mức advise, có bật user quota
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</details>
 
 <sub>--đã hết phần giải thích--</sub>
 
