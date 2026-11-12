@@ -334,6 +334,7 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
 </td>
 </tr>
 </table>
+</details>
 
 - **b. Quản lý File Descriptor và Open File Description:** Sau khi `shm_open()` thành công, Kernel trả về một File Descriptor cho tiến trình gọi. **Ví dụ:**
 
