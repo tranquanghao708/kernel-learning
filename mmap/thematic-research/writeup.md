@@ -444,3 +444,70 @@ Suy ra, đây là cấu hình mount khá an toàn và phổ biến của `/dev/s
 
 > [!IMPORTANT]
 > **Điểm quan trọng:** Hai tiến trình có thể có hai File Descriptor khác nhau nhưng cùng tham chiếu đến một Shared Memory Object.
+
+- **c. Quản lý Virtual Memory Area (VMA):** Khi chương trình gọi `mmap()`, Kernel tiến hành thiết lập một vùng mapping trong Virtual Address Space của tiến trình. **Ví dụ:**
+
+```c
+void *ptr = mmap(
+    NULL, //cho kernel lựa vaddr
+    4096,//4KB
+    PROT_READ | PROT_WRITE, //đọc và ghi
+    MAP_SHARED, //chia sẻ
+    fd, //file descriptor
+    0 //offset=0
+);
+```
+
+Nếu thành công, Kernel tạo hoặc thiết lập một vùng Virtual Memory Area (VMA) tương ứng với mapping đó. Trên Linux, VMA được biểu diễn bởi cấu trúc `struct vm_area_struct`. VMA chứa những thông tin quan trọng như:
+- Phạm vi địa chỉ ảo của vùng mapping.
+- Quyền truy cập bộ nhớ.
+- Các cờ mapping như `VM_SHARED`.
+- Thông tin liên kết đến đối tượng file backing mapping.
+- Offset tương ứng trong đối tượng được ánh xạ.
+
+**Ví dụ về mặt khái niệm:**
+
+```
+Process A
+Virtual Address Space
+
+0x7f100000 ┌─────────────────────┐
+           │                     │
+           │   Shared Memory     │
+           │                     │
+0x7f101000 └─────────────────────┘
+```
+
+Process B có thể ánh xạ cùng object tại một địa chỉ hoàn toàn khác:
+
+```
+Process B
+Virtual Address Space
+
+0x7f500000 ┌─────────────────────┐
+           │                     │
+           │   Shared Memory     │
+           │                     │
+0x7f501000 └─────────────────────┘
+```
+
+Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham chiếu đến một đối tượng backing memory.
+
+- **d. Quản lý Physical Pages và Page Table:** Đây là một trong những nhiệm vụ quan trọng nhất của Kernel trong cơ chế Shared Memory. Virtual Address mà chương trình sử dụng không phải địa chỉ vật lý thực tế của RAM. CPU cần thông qua Memory Management Unit (MMU) để dịch địa chỉ ảo sang địa chỉ vật lý. Kernel chịu trách nhiệm thiết lập và quản lý các cấu trúc bộ nhớ ảo, bao gồm Page Table và các ánh xạ tương ứng. **Ví dụ, giả sử:**
+  - Process A ánh xạ Shared Memory tại `0x7f100000`.
+  - Process B ánh xạ Shared Memory tại `0x7f500000`.
+  - Cả hai cùng truy cập một Physical Page.
+
+  <p align="center">
+	<img src="image/image0.png" alt="mô hình mối quan hệ">
+  </p>
+
+  Kết quả:
+  - Process A ghi dữ liệu vào vùng mapping.
+  - Dữ liệu được ghi vào Physical Page tương ứng.
+  - Process B có thể đọc được dữ liệu đó thông qua mapping của chính nó.
+
+  Đây là bản chất của cơ chế chia sẻ bộ nhớ: nhiều Virtual Address thuộc các tiến trình khác nhau có thể cùng ánh xạ đến một Physical Page.
+
+> [!NOTE]
+> **Lưu ý:** Việc thiết lập mapping không nhất thiết khiến toàn bộ Physical Pages được cấp phát ngay lập tức. Linux có thể sử dụng Demand Paging để chỉ xử lý trang khi thực sự được truy cập.
