@@ -406,6 +406,15 @@ Suy ra, đây là cấu hình mount khá an toàn và phổ biến của `/dev/s
 
   Ở đây, chương trình yêu cầu Kernel tạo một POSIX Shared Memory Object có tên `/my_shm`. Trên Linux, tên này thường được ánh xạ thành một filesystem object chẳng hạn như `/dev/shm/my_shm`. Có thể quan sát nó với lệnh `ls -l /dev/shm/`, nếu object tồn tại, chúng ta có thể nhìn thấy tên `my_shm` trong danh sách.
 
+- **Tại sao Linux sử dụng tmpfs cho `/dev/shm`?:** Có một lý do quan trọng Shared Memory cần một đối tượng backing để nhiều tiến trình có thể cùng ánh xạ và truy cập dữ liệu. `tmpfs` cung cấp cơ chế filesystem object kết hợp với hệ thống quản lý bộ nhớ ảo của Linux. Một số đặc điểm:
+  - Không cần tạo phân vùng ổ đĩa riêng.
+  - Hỗ trợ tạo và quản lý filesystem object.
+  - Có thể ánh xạ object vào Virtual Address Space thông qua `mmap()`.
+  - Dữ liệu có thể được nhiều tiến trình cùng truy cập.
+  - Có thể sử dụng swap khi hệ thống cần.
+
+  Tuy nhiên, đừng hiểu rằng toàn bộ dữ liệu trong `/dev/shm` luôn nằm cố định trong RAM. `tmpfs` sử dụng bộ nhớ ảo và có khả năng swap.
+
 <sub>--đã hết phần giải thích--</sub>
 
 ---
