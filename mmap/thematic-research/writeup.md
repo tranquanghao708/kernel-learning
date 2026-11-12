@@ -317,6 +317,7 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
   - Tạo mới hoặc mở object đã tồn tại.
   - Quản lý metadata của object.
   - Duy trì các tham chiếu đến object trong suốt vòng đời sử dụng.
+
   Cần phân biệt rằng Shared Memory Object không đơn giản là một vùng địa chỉ Virtual Memory. Nó là một đối tượng được quản lý bởi Kernel, có thể được nhiều tiến trình mở và ánh xạ vào không gian địa chỉ riêng của chúng.
 
 <details>
@@ -326,6 +327,41 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
 <td>
 
 ---
+
+`/dev/shm` là một thư mục đặc biệt trên Linux, thường được sử dụng làm mount point cho filesystem `tmpfs`, nhằm cung cấp không gian lưu trữ cho các đối tượng POSIX Shared Memory.
+
+**Nói đơn giản:** khi một chương trình sử dụng `shm_open()` để tạo POSIX Shared Memory Object, trên Linux, đối tượng đó thường được biểu diễn bằng một filesystem object nằm trong `/dev/shm`.
+
+Điều này tạo ra mối liên hệ trực tiếp giữa POSIX Shared Memory API và cơ chế filesystem của Linux.
+
+- **/dev/shm nằm ở đâu trong linux?:** Trên Linux, /dev/shm là một đường dẫn thuộc filesystem hierarchy (Cấu trúc phân cấp hệ thống tệp). **Ví dụ:**
+
+  ```bash
+  $ ls -ld /dev/shm
+  drwxrwxrwt 2 root root 40 Nov 12 20:00 /dev/shm
+  ```
+
+  Kiểm tra filesystem đang được mount:
+
+  ```bash
+  $ findmnt /dev/shm
+  ```
+
+  một kết quả thường gặp:
+
+  ```bash
+  TARGET   SOURCE FSTYPE OPTIONS
+  /dev/shm tmpfs  tmpfs  rw,nosuid,nodev,inode64
+  ```
+
+  Trong đó:
+  - `/dev/shm`: Mount point
+  - `tmpfs`: Filesystem lưu trữ dữ liệu trong bộ nhớ ảo
+  - `rw`: Cho phép đọc và ghi
+  - `nosuid`: Không áp dụng hiệu lực SUID/SGID từ file trên filesystem
+  - `nodev`: Không cho phép sử dụng device special files
+
+  **Lưu ý:** `tmpfs` không phải một phân vùng ổ đĩa vật lý. Nó sử dụng cơ chế quản lý bộ nhớ của Kernel và có thể sử dụng swap khi cần.
 
 <sub>--đã hết phần giải thích--</sub>
 
