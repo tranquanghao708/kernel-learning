@@ -347,3 +347,12 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
   <p align="center">
 	<img src="image/image0.png" alt="mô hình mối quan hệ">
   </p>
+
+  Một số khái niệm cần phân biệt:
+  - **File Descriptor:** Số nguyên đại diện cho một mục trong bảng FD của process
+  - **struct file:** Biểu diễn một lần mở file ở cấp Kernel
+  - **Inode:** Biểu diễn đối tượng filesystem và metadata của nó
+  - **Shared Memory Object:** Đối tượng POSIX Shared Memory được truy cập thông qua filesystem
+
+> [!IMPORTANT]
+> **Điểm quan trọng:** Hai tiến trình có thể có hai File Descriptor khác nhau nhưng cùng tham chiếu đến một Shared Memory Object.
