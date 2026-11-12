@@ -511,3 +511,42 @@ Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham
 
 > [!NOTE]
 > **Lưu ý:** Việc thiết lập mapping không nhất thiết khiến toàn bộ Physical Pages được cấp phát ngay lập tức. Linux có thể sử dụng Demand Paging để chỉ xử lý trang khi thực sự được truy cập.
+
+<details>
+<summary><b>[Câu hỏi]</b> Demand Paging là gì?</summary>
+<table>
+<tr>
+<td>
+
+---
+
+<sub>--đã hết phần giải thích--</sub>
+
+---
+
+</td>
+</tr>
+</table>
+</details>
+
+- **e. Quản lý Backing Storage và Page Cache:** Trên Linux, POSIX Shared Memory thường sử dụng tmpfs làm filesystem backing object. `tmpfs` là một filesystem sử dụng bộ nhớ ảo của Kernel để lưu trữ dữ liệu. Nội dung của nó thường nằm trong RAM, nhưng cũng có thể được swap ra ngoài khi hệ thống cần. Kernel quản lý:
+  - Metadata của Shared Memory Object.
+  - Các trang dữ liệu backing object.
+  - Quan hệ giữa object và những mapping sử dụng object đó.
+  - Việc cấp phát, thu hồi và quản lý các trang bộ nhớ.
+
+  **Một điểm cần hiểu rõ:** Không nên đồng nhất `tmpfs` với một vùng RAM cố định. `tmpfs` sử dụng cơ chế quản lý bộ nhớ ảo của Linux, bao gồm cả khả năng sử dụng swap.
+- **f. Quản lý vòng đời và giải phóng tài nguyên:** Kernel còn chịu trách nhiệm quản lý vòng đời của Shared Memory Object và các tài nguyên liên quan. **Ví dụ**, khi chương trình thực hiện:
+
+  ```c
+  munmap(ptr, 4096);
+  close(fd);
+  shm_unlink("/my_shm");
+  ```
+
+  Mỗi thao tác có ý nghĩa khác nhau:
+  - `munmap()`: Hủy mapping trong Virtual Address Space
+  - `close()`: Đóng File Descriptor
+  - `shm_unlink()`: Xóa tên Shared Memory Object
+
+  Việc gọi một trong các API trên không đồng nghĩa với việc toàn bộ Shared Memory được giải phóng ngay lập tức. Kernel phải xét đến những mapping, file reference và tham chiếu còn tồn tại trước khi có thể thu hồi tài nguyên tương ứng.
