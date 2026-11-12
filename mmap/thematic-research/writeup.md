@@ -398,6 +398,14 @@ Suy ra, đây là cấu hình mount khá an toàn và phổ biến của `/dev/s
 
 </details>
 
+- **Mối quan hệ giữa `/dev/shm` và POSIX Shared Memory:** Để hiểu rõ vai trò của `/dev/shm`, hãy xét một chương trình C sử dụng `shm_open()`:
+
+  ```c
+  int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+  ```
+
+  Ở đây, chương trình yêu cầu Kernel tạo một POSIX Shared Memory Object có tên `/my_shm`. Trên Linux, tên này thường được ánh xạ thành một filesystem object chẳng hạn như `/dev/shm/my_shm`. Có thể quan sát nó với lệnh `ls -l /dev/shm/`, nếu object tồn tại, chúng ta có thể nhìn thấy tên `my_shm` trong danh sách.
+
 <sub>--đã hết phần giải thích--</sub>
 
 ---
