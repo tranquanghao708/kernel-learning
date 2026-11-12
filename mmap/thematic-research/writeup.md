@@ -371,7 +371,7 @@ Trong kiến trúc POSIX Shared Memory, Linux Kernel (nhân hệ điều hành L
 Kết quả:
 
 <p align="center">
-<img src="image/image0.png" alt="mô hình mối quan hệ">
+<img src="image/image1.png" alt="kết quả terminal">
 </p>
 
 Ở đây ta thấy 
@@ -499,7 +499,7 @@ Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham
   - Cả hai cùng truy cập một Physical Page.
 
   <p align="center">
-	<img src="image/image0.png" alt="mô hình mối quan hệ">
+	<img src="image/image2.png" alt="mô hình mối quan hệ">
   </p>
 
   Kết quả:
