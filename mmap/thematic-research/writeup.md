@@ -520,6 +520,32 @@ Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham
 
 ---
 
+Demand Paging (phân trang theo nhu cầu) là một cơ chế quản lý bộ nhớ ảo (Virtual Memory Management), trong đó hệ điều hành chỉ đưa một trang bộ nhớ (Memory Page) vào RAM khi tiến trình thực sự cần truy cập đến trang đó, thay vì nạp toàn bộ các trang vào RAM ngay từ đầu.
+
+Nói cách khác, Kernel không nhất thiết phải cấp phát và đưa toàn bộ dữ liệu của một vùng nhớ vào Physical Memory ngay khi chương trình yêu cầu mapping. Thay vào đó, các trang bộ nhớ có thể được xử lý dần theo nhu cầu truy cập thực tế. Demand Paging là một cơ chế quan trọng trong Linux, đặc biệt khi nghiên cứu `mmap()`, POSIX Shared Memory, Page Table và Page Fault.
+
+- **Tại sao cần Demand Paging?:** Giả sử một chương trình yêu cầu ánh xạ một vùng nhớ có kích thước 100 MB:
+
+  ```c
+  void *ptr = mmap(
+      NULL,
+      100 * 1024 * 1024,
+      PROT_READ | PROT_WRITE,
+      MAP_SHARED,
+      fd,
+      0
+  );
+  ```
+
+  Nếu Kernel phải cấp phát toàn bộ 100 MB Physical Memory ngay khi gọi mmap(), hệ thống sẽ phải tiêu tốn tài nguyên RAM ngay cả khi chương trình chỉ sử dụng một phần rất nhỏ vùng nhớ đó. **Ví dụ:**
+  - Chương trình yêu cầu mapping: 100 MB.
+  - Chương trình thực tế chỉ truy cập: 4 KB.
+  - 99 MB còn lại chưa được sử dụng.
+
+  Demand Paging giúp hệ thống tránh việc phải nạp hoặc cấp phát toàn bộ các trang dữ liệu không cần thiết ngay từ đầu.
+
+  **Lưu ý:** `mmap()` thành công không đồng nghĩa với việc toàn bộ Physical Pages đã được cấp phát và đưa vào RAM.
+
 <sub>--đã hết phần giải thích--</sub>
 
 ---
