@@ -16,8 +16,9 @@
 	 - [1.4.1. User Space và Kernel Space là gì?](#141-user-space-và-kernel-space-là-gì)
 	 - [1.4.2. Vai trò của User Space trong POSIX Shared Memory](#142-vai-trò-của-user-space-trong-posix-shared-memory)
 	 - [1.4.3. Vai trò của Linux Kernel](#143-vai-trò-của-linux-kernel)
-- 2.Shared Memory Object
-  - 2.1. Shared Memory Object là gì?
+- [2.Shared Memory Object](#2shared-memory-object)
+  - [2.1. Shared Memory Object là gì?](#21-shared-memory-object-là-gì)
+    - [2.1.1. Các thành phần cấu thành Shared Memory Object](#211-các-thành-phần-cấu-thành-shared-memory-object)
   - 2.2. Namespace và tên đối tượng
   - 2.3. File descriptor và vòng đời đối tượng
   - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area
@@ -580,6 +581,17 @@ Tuy nhiên, tại thời điểm này, cần phân biệt ba vấn đề:
 
 Ba hoạt động này không xảy ra đồng thời và có mục đích khác nhau.
 
+#### 2.1.1. Các thành phần cấu thành Shared Memory Object
+
+Để hiểu Shared Memory Object ở cấp độ hệ điều hành, có thể phân tích các thành phần sau:
+- **Inode:** Đại diện đối tượng filesystem và metadata
+- **File Descriptor:** Cho phép process tham chiếu đến object
+- **Object Size:** Kích thước logic của object
+- **Backing Pages:** Các trang bộ nhớ lưu trữ nội dung object
+- **Memory Mapping:** Quan hệ giữa object và Virtual Address Space của process
+
+Không phải tất cả các thành phần trên đều nằm bên trong một cấu trúc dữ liệu duy nhất. Đây là các thành phần ở những tầng khác nhau của kiến trúc Linux.
+
 ### 5.5. Demand Paging
 
 Demand Paging (phân trang theo nhu cầu) là một cơ chế quản lý bộ nhớ ảo (Virtual Memory Management), trong đó hệ điều hành chỉ đưa một trang bộ nhớ (Memory Page) vào RAM khi tiến trình thực sự cần truy cập đến trang đó, thay vì nạp toàn bộ các trang vào RAM ngay từ đầu.
@@ -599,7 +611,7 @@ Nói cách khác, Kernel không nhất thiết phải cấp phát và đưa toà
   );
   ```
 
-  Nếu Kernel phải cấp phát toàn bộ 100 MB Physical Memory ngay khi gọi mmap(), hệ thống sẽ phải tiêu tốn tài nguyên RAM ngay cả khi chương trình chỉ sử dụng một phần rất nhỏ vùng nhớ đó. **Ví dụ:**
+  Nếu Kernel phải cấp phát toàn bộ 100 MB Physical Memory ngay khi gọi `mmap()`, hệ thống sẽ phải tiêu tốn tài nguyên RAM ngay cả khi chương trình chỉ sử dụng một phần rất nhỏ vùng nhớ đó. **Ví dụ:**
   - Chương trình yêu cầu mapping: 100 MB.
   - Chương trình thực tế chỉ truy cập: 4 KB.
   - 99 MB còn lại chưa được sử dụng.
