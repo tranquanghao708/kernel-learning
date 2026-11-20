@@ -19,7 +19,8 @@
 - [2.Shared Memory Object](#2shared-memory-object)
   - [2.1. Shared Memory Object là gì?](#21-shared-memory-object-là-gì)
     - [2.1.1. Các thành phần cấu thành Shared Memory Object](#211-các-thành-phần-cấu-thành-shared-memory-object)
-  - 2.2. Namespace và tên đối tượng
+  - [2.2. Namespace và tên đối tượng](#22-namespace-và-tên-đối-tượng)
+    - [2.2.1. POSIX Shared Memory Namespace là gì?](#221-posix-shared-memory-namespace-là-gì)
   - 2.3. File descriptor và vòng đời đối tượng
   - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area
   - 2.5. Backing storage và Page Cache trên Linux
@@ -610,6 +611,28 @@ int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
 
 > [!IMPORTANT]
 > **Điểm quan trọng:** `/my_shm` không phải đường dẫn Virtual Address, cũng không phải địa chỉ vật lý. Nó là tên dùng để tra cứu một đối tượng trong namespace.
+
+#### 2.2.2. Quy tắc đặt tên POSIX Shared Memory
+
+POSIX quy định một số yêu cầu về tên Shared Memory Object.
+- Phải bắt đầu bằng `/`: vì tên phải có dấu `/` ở đầu
+- Không được có thêm `/`: vì tên portable chỉ có một dấu `/` ở đầu
+- Phải có ít nhất một ký tự sau `/`: vì `/` đơn độc không phải tên hợp lệ
+- Phân biệt chữ hoa và chữ thường `/MyShm` và `/myshm` là hai tên khác nhau
+
+**Ví dụ:**
+
+```c
+shm_open("/my_shm", O_CREAT | O_RDWR, 0666);    // Hợp lệ
+shm_open("/shared_memory", O_CREAT | O_RDWR, 0666); // Hợp lệ
+shm_open("/MyShm", O_CREAT | O_RDWR, 0666);     // Hợp lệ
+shm_open("my_shm", O_CREAT | O_RDWR, 0666);     // Không portable
+shm_open("/my/shm", O_CREAT | O_RDWR, 0666);    // Không portable
+shm_open("/", O_CREAT | O_RDWR, 0666);          // Không hợp lệ
+```
+
+> [!NOTE]
+> **Lưu ý:** Đây là quy tắc tên theo POSIX, không nên đồng nhất nó với quy tắc đặt đường dẫn thông thường của Linux filesystem.
 
 ### 5.5. Demand Paging
 
