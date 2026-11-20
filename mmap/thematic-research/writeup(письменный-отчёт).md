@@ -21,6 +21,8 @@
     - [2.1.1. Các thành phần cấu thành Shared Memory Object](#211-các-thành-phần-cấu-thành-shared-memory-object)
   - [2.2. Namespace và tên đối tượng](#22-namespace-và-tên-đối-tượng)
     - [2.2.1. POSIX Shared Memory Namespace là gì?](#221-posix-shared-memory-namespace-là-gì)
+    - [2.2.2. Quy tắc đặt tên POSIX Shared Memory](#222-quy-tắc-đặt-tên-posix-shared-memory)
+    - [2.2.3. Linux ánh xạ POSIX Shared Memory Namespace vào `/dev/shm`](#223-linux-ánh-xạ-posix-shared-memory-namespace-vào-devshm)
   - 2.3. File descriptor và vòng đời đối tượng
   - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area
   - 2.5. Backing storage và Page Cache trên Linux
@@ -633,6 +635,52 @@ shm_open("/", O_CREAT | O_RDWR, 0666);          // Không hợp lệ
 
 > [!NOTE]
 > **Lưu ý:** Đây là quy tắc tên theo POSIX, không nên đồng nhất nó với quy tắc đặt đường dẫn thông thường của Linux filesystem.
+
+#### 2.2.3. Linux ánh xạ POSIX Shared Memory Namespace vào `/dev/shm`
+
+POSIX quy định giao diện lập trình và cách ứng dụng sử dụng Shared Memory Object, nhưng không bắt buộc hệ thống phải lưu trữ chúng tại `/dev/shm`. Trên Linux, implementation POSIX Shared Memory thông thường sử dụng `tmpfs`, được mount tại `/dev/shm`. Do đó, khi gọi:
+
+```c
+shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+```
+
+nó thường tạo hoặc mở một filesystem object tương ứng với `/dev/shm/my_shm`. Có thể hình dung:
+
+```
+             User Space
+        ┌──────────────────┐
+        │    Process A     │
+        │                  │
+        │ shm_open()       │
+        │ "/my_shm"        │
+        └────────┬─────────┘
+                 │
+                 │ System call / libc
+                 ▼
+             Kernel Space
+        ┌──────────────────┐
+        │   VFS / tmpfs    │
+        │                  │
+        │  /dev/shm        │
+        │      │           │
+        │      ▼           │
+        │   my_shm         │
+        │                  │
+        │ Shared Memory    │
+        │ Object           │
+        └──────────────────┘
+```
+
+Có thể kiểm tra trên Linux bằng `findmnt /dev/shm`. Kiểm tra các object hiện có `ls -lah /dev/shm/`. **Ví dụ:**
+
+```
+/dev/shm/
+├── my_shm
+├── shared_buffer
+└── ipc_region
+```
+
+Các tên trên tương ứng với những filesystem object trong `tmpfs`. Chúng không phải các vùng Virtual Address của process. Đặc biệt là không được kết luận rằng POSIX bắt buộc Shared Memory phải nằm trong `/dev/shm`. Đây là cách triển khai phổ biến của Linux.
 
 ### 5.5. Demand Paging
 
