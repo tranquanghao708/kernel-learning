@@ -1,4 +1,4 @@
-# Kernel : Chuyên đề MAP_SHARED (MAP_SHARED Thematic Research)
+# Kernel : Chuyên đề `MAP_SHARED` (`MAP_SHARED` Thematic Research)
 
 **Mục lục**
 
@@ -591,6 +591,25 @@ Ba hoạt động này không xảy ra đồng thời và có mục đích khác
 - **Memory Mapping:** Quan hệ giữa object và Virtual Address Space của process
 
 Không phải tất cả các thành phần trên đều nằm bên trong một cấu trúc dữ liệu duy nhất. Đây là các thành phần ở những tầng khác nhau của kiến trúc Linux.
+
+### 2.2. Namespace và tên đối tượng (Namespace and Object Naming)
+#### 2.2.1. POSIX Shared Memory Namespace là gì?
+
+Trong POSIX Shared Memory, namespace là không gian định danh mà hệ điều hành sử dụng để phân biệt và tìm kiếm các Shared Memory Object thông qua tên của chúng. Khi một process muốn tạo hoặc mở một Shared Memory Object, nó không cần biết địa chỉ bộ nhớ ảo của object đó. Thay vào đó, process sử dụng một tên định danh thông qua hàm `shm_open()`. **Ví dụ:**
+
+```c
+int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
+```
+
+Ở đây:
+- `/my_shm` là tên định danh của Shared Memory Object.
+- `O_CREAT` yêu cầu tạo object nếu nó chưa tồn tại.
+- `O_RDWR` yêu cầu mở object với quyền đọc và ghi.
+- `0666` là permission mode được áp dụng khi tạo object, sau khi xét umask.
+- `fd` là file descriptor mà process nhận được nếu thao tác thành công.
+
+> [!IMPORTANT]
+> **Điểm quan trọng:** `/my_shm` không phải đường dẫn Virtual Address, cũng không phải địa chỉ vật lý. Nó là tên dùng để tra cứu một đối tượng trong namespace.
 
 ### 5.5. Demand Paging
 
