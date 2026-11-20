@@ -815,6 +815,393 @@ Sau đó, process có thể xóa tên object `shm_unlink("/shared_buffer");`. Đ
 
 Sau khi `shm_unlink()` thành công, process khác không thể mở object bằng tên cũ nữa. Tuy nhiên, các process đang giữ tham chiếu hợp lệ hoặc mapping tới object vẫn có thể tiếp tục sử dụng nó. Kernel chỉ có thể giải phóng object khi những tham chiếu cần thiết đã được giải phóng và không còn mapping giữ object tồn tại.
 
+### 2.3. File Descriptor và vòng đời đối tượng (File Descriptor and Object Lifecycle)
+#### 2.3.1. File Descriptor trong POSIX Shared Memory là gì?
+
+Khi một process gọi `shm_open()` để tạo hoặc mở một POSIX Shared Memory Object, nếu thao tác thành công, kernel trả về một file descriptor (FD). File descriptor là một số nguyên không âm, được sử dụng làm định danh cho một tài nguyên đang được process mở. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+```
+
+Giá trị fd có thể là `3`, `4`, `5` hoặc một số nguyên khác tùy thuộc vào những file descriptor mà process đang sử dụng. Trong Linux, ba file descriptor mặc định thường là:
+
+- `0`: stdin là standard Input
+- `1`: stdout là standard Output
+- `2`: stderr là standard Error
+- `3` trở lên : các tài nguyên được mở thêm	File, socket, Shared Memory Object...
+
+Ví dụ:
+
+```c
+printf("Shared Memory FD: %d\n", fd);
+```
+
+Kết quả có thể là:
+
+```
+Shared Memory FD: 3
+```
+
+Tuy nhiên, cần hiểu rằng `3` không phải ID cố định của Shared Memory Object. Nó chỉ là một entry trong file descriptor table của process hiện tại.
+
+#### 2.3.2. Kiến trúc quản lý File Descriptor trong Linux
+
+Để hiểu FD thực sự hoạt động như thế nào, cần phân biệt ba thành phần:
+- File Descriptor Table Entry
+- struct file
+- Inode
+
+Khi process mở một Shared Memory Object, Linux sử dụng các cấu trúc quản lý file của kernel để liên kết FD với object tương ứng. Mô hình khái quát:
+
+```
+                    Process A
+              User Space / Kernel Space
+              ┌────────────────────────┐
+              │ File Descriptor Table  │
+              │                        │
+              │ FD 0 ──────────────┐   │
+              │ FD 1 ───────────┐  │   │
+              │ FD 2 ─────────┐ │  │   │
+              │ FD 3 ──────┐  │ │  │   │
+              └────────────│──│─│──│───┘
+                           │  │ │  │
+                           ▼  ▼ ▼  ▼
+                     Kernel Objects
+              ┌────────────────────────┐
+              │      struct file       │
+              │                        │
+              │ f_inode                │
+              │ f_mapping              │
+              │ f_pos                  │
+              │ f_flags                │
+              └────────────┬───────────┘
+                           │
+                           ▼
+              ┌────────────────────────┐
+              │         Inode          │
+              │                        │
+              │ Metadata               │
+              │ File size              │
+              │ Permissions            │
+              │ Filesystem operations  │
+              └────────────────────────┘
+```
+
+Đây là sơ đồ khái quát, không phải toàn bộ cấu trúc nội bộ của Linux.
+- **A. File Descriptor Table Entry:** Mỗi process có một bảng quản lý các file descriptor đang mở. **Ví dụ:**
+
+  ```
+  Process A
+  ┌───────────────────────────┐
+  │ File Descriptor Table     │
+  ├───────────┬───────────────┤
+  │ FD 0      │ stdin         │
+  │ FD 1      │ stdout        │
+  │ FD 2      │ stderr        │
+  │ FD 3      │ Shared Memory │
+  │ FD 4      │ Socket        │
+  └───────────┴───────────────┘
+  ```
+
+  `FD 3` chỉ là chỉ số để tìm entry tương ứng trong bảng này.
+- **B. struct file:** Trong Linux, struct file đại diện cho một open file description ở cấp kernel. Nó lưu trữ trạng thái của một lần mở file, chẳng hạn:
+  - File status flags.
+  - File position (`f_pos`).
+  - Tham chiếu tới inode.
+  - Thông tin mapping thông qua `f_mapping`.
+  - Các file operations.
+
+  Đối với POSIX Shared Memory, struct file giúp kernel quản lý trạng thái mở và cung cấp liên kết cần thiết cho các thao tác như `ftruncate()` và `mmap()`.
+- **C. Inode:** Inode là cấu trúc filesystem biểu diễn một filesystem object. Đối với POSIX Shared Memory trên Linux, object thường được quản lý thông qua `tmpfs/shmem`. Inode chứa các thông tin như:
+  - Metadata.
+  - Permissions.
+  - Object size.
+  - Các thông tin quản lý filesystem liên quan.
+
+  Không nên nhầm inode với dữ liệu thực tế của Shared Memory. Inode là metadata và điểm liên kết tới những thành phần quản lý dữ liệu của filesystem.
+
+#### 2.3.3. Quan hệ giữa File Descriptor và Shared Memory Object
+
+Một Shared Memory Object có thể được nhiều process mở đồng thời. **Ví dụ:**
+
+```c
+// Process A
+int fd_a = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+
+
+// Process B
+int fd_b = shm_open(
+    "/shared_buffer",
+    O_RDWR,
+    0666
+);
+```
+
+Giả sử hai process nhận được:
+
+```
+Process A: fd_a = 3
+Process B: fd_b = 4
+```
+
+Hai FD có giá trị khác nhau nhưng cùng tham chiếu đến một Shared Memory Object.
+
+```
+           Process A                      Process B
+     ┌──────────────────┐            ┌──────────────────┐
+     │ FD Table         │            │ FD Table         │
+     │                  │            │                  │
+     │ FD 3             │            │ FD 4             │
+     └────────┬─────────┘            └────────┬─────────┘
+              │                               │
+              ▼                               ▼
+        ┌────────────┐                   ┌────────────┐
+        │ struct file│                   │ struct file│
+        │     A      │                   │     B      │
+        └─────┬──────┘                   └─────┬──────┘
+              │                               │
+              └──────────────┬────────────────┘
+                             ▼
+                  ┌────────────────────┐
+                  │ Shared Memory      │
+                  │ Object             │
+                  │                    │
+                  │  /shared_buffer    │
+                  └────────────────────┘
+```
+
+Trong trường hợp hai process gọi `shm_open()` độc lập, mỗi lần mở có thể tạo một open file description riêng. Những struct file này vẫn có thể tham chiếu tới cùng một underlying inode/object. Đây là điểm cần phân biệt:
+
+| Thành phần |	Process A |	Process B |
+|-|-|-|
+| File descriptor |	3 |	4 |
+| Open file description	 | Riêng | 	Riêng |
+| Shared Memory Object	| Chung	| Chung |
+| Inode của object	| Chung |	Chung |
+
+
+#### 2.3.4. Quan hệ giữa `close()` và Shared Memory Object
+
+Hàm `close()` dùng để đóng một file descriptor. **Ví dụ** `close(fd);`. Khi gọi `close(fd)`, process yêu cầu kernel giải phóng `FD` tương ứng khỏi file descriptor table. Tuy nhiên, điều này không đồng nghĩa với việc Shared Memory Object bị xóa. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+
+ftruncate(fd, 4096);
+
+void *ptr = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+
+close(fd);
+```
+
+Sau khi `close(fd)` thành công:
+- `FD` không còn được process sử dụng.
+- Process không thể tiếp tục gọi `ftruncate(fd, ...)` hoặc dùng `FD` cũ cho một thao tác mới.
+- Memory mapping được tạo trước đó vẫn tồn tại.
+- Process vẫn có thể truy cập vùng nhớ thông qua `ptr`. Tại sao?
+
+Bởi vì sau khi `mmap()` thành công, kernel đã thiết lập một memory mapping có tham chiếu riêng tới đối tượng backing tương ứng. Mapping không phụ thuộc vào việc `FD` ban đầu còn mở hay không.
+
+**Mô hình:**
+
+``` 
+               Process A
+          ┌─────────────────────┐
+          │ File Descriptor     │
+          │                     │
+          │ FD 3                │
+          └──────────┬──────────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │ Shared Memory │
+             │ Object        │
+             └───────┬───────┘
+                     │
+                     │ mmap()
+                     ▼
+          ┌─────────────────────┐
+          │ Virtual Address     │
+          │ Space               │
+          │                     │
+          │ ptr ─────────────┐  │
+          └──────────────────│──┘
+                             │
+                             ▼
+                    Shared Pages
+```
+
+Sau khi gọi `close(fd)`, liên kết thông qua `FD` bị loại bỏ, nhưng mapping vẫn giữ tham chiếu cần thiết để tiếp tục sử dụng object.
+
+**Kết luận:** `close()` đóng handle, không phải thao tác xóa Shared Memory Object.
+
+#### 2.3.5. Quan hệ giữa `shm_unlink()` và vòng đời đối tượng
+
+`shm_unlink()` là hàm dùng để xóa tên của một POSIX Shared Memory Object khỏi namespace. **Ví dụ:** `shm_unlink("/shared_buffer");`. Điều này tương tự về mặt vòng đời tên với việc unlink một file trong filesystem. Sau khi **shm_unlink()** thành công:
+- 1.Tên `/shared_buffer` bị loại khỏi namespace.
+- 2.Process mới không thể mở object bằng tên cũ.
+- 3.Các file descriptor đang mở vẫn giữ tham chiếu tới object.
+- 4.Các memory mapping đang tồn tại vẫn có thể tiếp tục truy cập object.
+- 5.Object được giải phóng khi không còn các tham chiếu cần thiết.
+
+**Ví dụ:**
+
+```
+             Trước shm_unlink()
+
+          Namespace: /dev/shm
+          ┌────────────────────┐
+          │ /shared_buffer     │
+          └─────────┬──────────┘
+                    │
+                    ▼
+          ┌────────────────────┐
+          │ Shared Memory      │
+          │ Object             │
+          └───────┬────────────┘
+                  │
+           ┌──────┴──────┐
+           ▼             ▼
+        Process A     Process B
+        FD = 3        FD = 4
+        mmap()        mmap()
+
+
+             Sau shm_unlink()
+
+          Namespace: /dev/shm
+          ┌────────────────────┐
+          │ Không còn tên      │
+          └────────────────────┘
+
+          ┌────────────────────┐
+          │ Shared Memory      │
+          │ Object             │
+          └───────┬────────────┘
+                  │
+           ┌──────┴──────┐
+           ▼             ▼
+        Process A     Process B
+        FD = 3        FD = 4
+        mmap()        mmap()
+
+          Object vẫn tồn tại
+          thông qua các tham chiếu
+```
+
+Đây là cơ chế rất quan trọng trong thiết kế IPC. Một process có thể xóa tên object sau khi các process cần thiết đã mở nó. Những process đang sử dụng object vẫn tiếp tục hoạt động, trong khi process mới không thể truy cập object thông qua tên đã bị xóa.
+
+#### 2.3.6. `fork()` và `dup()` ảnh hưởng thế nào đến File Descriptor?
+
+Hai cơ chế này giúp hiểu sâu hơn về cách Linux quản lý `FD`.
+- **A. `fork()`:** Khi process gọi `fork()`, process con được tạo ra với một bản sao của file descriptor table. **Ví dụ:**
+
+  ```
+  int fd = shm_open(
+      "/shared_buffer",
+      O_CREAT | O_RDWR,
+      0666
+  );
+  
+  pid_t pid = fork();
+  ```
+
+  Sau `fork()`, cả process cha và process con đều có `FD` tương ứng.
+
+  ```
+                 Process Parent
+             ┌────────────────────┐
+             │ FD Table           │
+             │ FD 3               │
+             └─────────┬──────────┘
+                       │
+                       │
+                       ▼
+                struct file
+                       ▲
+                       │
+             ┌─────────┴──────────┐
+             │ FD Table           │
+             │ FD 3               │
+             └────────────────────┘
+                  Process Child
+  ```
+
+> [!IMPORTANT]
+> **Điểm quan trọng:**
+> - `FD table` được sao chép về mặt logic cho process con.
+> - Các `FD` tương ứng trong cha và con tham chiếu tới cùng open file description.
+> - Vì cùng open file description, một số trạng thái như file status flags và file offset được chia sẻ.
+> - Nếu mapping được tạo trước `fork()`, process con cũng thừa hưởng mapping đó.
+
+Đối với Shared Memory, cha và con có thể tiếp tục truy cập cùng object thông qua mapping được kế thừa.
+
+- **B. `dup()`:** Hàm `dup()` tạo một file descriptor mới tham chiếu tới cùng open file description với `FD` ban đầu. **Ví dụ:**
+
+  ```
+  int fd1 = shm_open(
+      "/shared_buffer",
+      O_CREAT | O_RDWR,
+      0666
+  );
+
+  int fd2 = dup(fd1);
+  ```
+
+  **Mô hình:**
+
+  ```
+             Process A
+       ┌──────────────────┐
+       │ FD Table         │
+       │                  │
+       │ FD 3 ───────┐    │
+       │             │    │
+       │ FD 4 ───────┼────┤
+       └─────────────│────┘
+                     │
+                     ▼
+              ┌────────────┐
+              │ struct file│
+              └─────┬──────┘
+                    │
+                    ▼
+             Shared Memory
+                 Object
+  ``
+
+  Khác với hai lần gọi `shm_open()` độc lập, `dup()` tạo `FD` mới nhưng vẫn tham chiếu tới cùng open file description.
+
+<div align="center">
+
+| Trường hợp	| Quan hệ |
+|-|-|
+| Hai lần `shm_open()`	| Có thể có hai struct file riêng, cùng object |
+| `dup(fd)`	| Hai `FD` cùng tham chiếu một open file description |
+| `fork()`	| `FD` tương ứng ở cha và con cùng tham chiếu open file description |
+
+</div>
+
 ### 5.5. Demand Paging
 
 Demand Paging (phân trang theo nhu cầu) là một cơ chế quản lý bộ nhớ ảo (Virtual Memory Management), trong đó hệ điều hành chỉ đưa một trang bộ nhớ (Memory Page) vào RAM khi tiến trình thực sự cần truy cập đến trang đó, thay vì nạp toàn bộ các trang vào RAM ngay từ đầu.
