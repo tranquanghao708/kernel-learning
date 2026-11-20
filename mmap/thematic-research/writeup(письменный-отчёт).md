@@ -26,8 +26,14 @@
     - [2.2.4. Namespace và phạm vi truy cập giữa các Process](#224-namespace-và-phạm-vi-truy-cập-giữa-các-process)
     - [2.2.5. Trùng tên và cơ chế tạo object](#225-trùng-tên-và-cơ-chế-tạo-object)
     - [2.2.6. Vòng đời của tên đối tượng](#226-vòng-đời-của-tên-đối-tượng)
-  - 2.3. File descriptor và vòng đời đối tượng
-  - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area
+  - [2.3. File descriptor và vòng đời đối tượng](#23-file-descriptor-và-vòng-đời-đối-tượng)
+    - [2.3.1. File Descriptor trong POSIX Shared Memory là gì?](#231-file-descriptor-trong-posix-shared-memory-là-gì)
+    - [2.3.2. Kiến trúc quản lý File Descriptor trong Linux](#232-kiến-trúc-quản-lý-file-descriptor-trong-linux)
+    - [2.3.3. Quan hệ giữa File Descriptor và Shared Memory Object](#233-quan-hệ-giữa-file-descriptor-và-shared-memory-object)
+    - [2.3.4. Quan hệ giữa `close()` và Shared Memory Object](#234-quan-hệ-giữa-close-và-shared-memory-object)
+    - [2.3.5. Quan hệ giữa `shm_unlink()` và vòng đời đối tượng](#235-quan-hệ-giữa-shm-unlink-và-vòng-đời-đối-tượng)
+    - [2.3.6. `fork()` và `dup()` ảnh hưởng thế nào đến File Descriptor?](#236-fork-và-dup-ảnh-hưởng-thế-nào-đến-file-descriptor)
+  - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area 
   - 2.5. Backing storage và Page Cache trên Linux
 - 3.`shm_open()`
   - 3.1. Function prototype
