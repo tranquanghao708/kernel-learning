@@ -23,6 +23,9 @@
     - [2.2.1. POSIX Shared Memory Namespace là gì?](#221-posix-shared-memory-namespace-là-gì)
     - [2.2.2. Quy tắc đặt tên POSIX Shared Memory](#222-quy-tắc-đặt-tên-posix-shared-memory)
     - [2.2.3. Linux ánh xạ POSIX Shared Memory Namespace vào `/dev/shm`](#223-linux-ánh-xạ-posix-shared-memory-namespace-vào-devshm)
+    - [2.2.4. Namespace và phạm vi truy cập giữa các Process](#224-namespace-và-phạm-vi-truy-cập-giữa-các-process)
+    - [2.2.5. Trùng tên và cơ chế tạo object](#225-trùng-tên-và-cơ-chế-tạo-object)
+    - [2.2.6. Vòng đời của tên đối tượng](#226-vòng-đời-của-tên-đối-tượng)
   - 2.3. File descriptor và vòng đời đối tượng
   - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area
   - 2.5. Backing storage và Page Cache trên Linux
@@ -794,21 +797,21 @@ void *ptr = mmap(
 );
 
 
-Sau đó, process có thể xóa tên object:
-shm_unlink("/shared_buffer");
+Sau đó, process có thể xóa tên object `shm_unlink("/shared_buffer");`. Điều này không đồng nghĩa với việc vùng nhớ đã được ánh xạ lập tức biến mất.
 
+<div align="center">
 
-Điều này không đồng nghĩa với việc vùng nhớ đã được ánh xạ lập tức biến mất.
-Thao tác	Tác động
-shm_open()	Tạo hoặc mở object theo tên
-close(fd)	Đóng file descriptor
-mmap()	Tạo memory mapping trong Virtual Address Space
-munmap()	Gỡ memory mapping
-shm_unlink()	Xóa tên object khỏi namespace
+| Thao tác |	Tác động |
+|-|-|
+| `shm_open()` |	Tạo hoặc mở object theo tên |
+| `close(fd)`	| Đóng file descriptor |
+| `mmap()` |	Tạo memory mapping trong Virtual Address Space |
+| `munmap()`	| Gỡ memory mapping |
+| `shm_unlink()` |	Xóa tên object khỏi namespace |
 
-Sau khi shm_unlink() thành công, process khác không thể mở object bằng tên cũ nữa. Tuy nhiên, các process đang giữ tham chiếu hợp lệ hoặc mapping tới object vẫn có thể tiếp tục sử dụng nó.
+</div>
 
-Kernel chỉ có thể giải phóng object khi những tham chiếu cần thiết đã được giải phóng và không còn mapping giữ object tồn tại.
+Sau khi `shm_unlink()` thành công, process khác không thể mở object bằng tên cũ nữa. Tuy nhiên, các process đang giữ tham chiếu hợp lệ hoặc mapping tới object vẫn có thể tiếp tục sử dụng nó. Kernel chỉ có thể giải phóng object khi những tham chiếu cần thiết đã được giải phóng và không còn mapping giữ object tồn tại.
 
 ### 5.5. Demand Paging
 
