@@ -787,6 +787,8 @@ Sau khi tạo object, process có thể thực hiện `ftruncate(fd, 4096);`
 
 
 Tiếp theo, ánh xạ object vào Virtual Address Space:
+
+```c
 void *ptr = mmap(
     NULL,
     4096,
@@ -795,7 +797,7 @@ void *ptr = mmap(
     fd,
     0
 );
-
+```
 
 Sau đó, process có thể xóa tên object `shm_unlink("/shared_buffer");`. Điều này không đồng nghĩa với việc vùng nhớ đã được ánh xạ lập tức biến mất.
 
