@@ -682,6 +682,134 @@ Có thể kiểm tra trên Linux bằng `findmnt /dev/shm`. Kiểm tra các obje
 
 Các tên trên tương ứng với những filesystem object trong `tmpfs`. Chúng không phải các vùng Virtual Address của process. Đặc biệt là không được kết luận rằng POSIX bắt buộc Shared Memory phải nằm trong `/dev/shm`. Đây là cách triển khai phổ biến của Linux.
 
+#### 2.2.4. Namespace và phạm vi truy cập giữa các Process
+
+Điểm quan trọng của namespace là nhiều process có thể sử dụng cùng một tên để truy cập cùng một Shared Memory Object. **Ví dụ**, có hai process:
+
+Process A:
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+```
+
+Process B:
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_RDWR,
+    0666
+);
+```
+
+Nếu cả hai process nhìn thấy cùng một POSIX Shared Memory namespace và object vẫn tồn tại, chúng có thể mở cùng một object. **Mô hình:**
+
+```
+       Process A                       Process B
+┌────────────────────┐          ┌────────────────────┐
+│ shm_open()         │          │ shm_open()         │
+│ "/shared_buffer"   │          │ "/shared_buffer"   │
+│                    │          │                    │
+│ fd = 3             │          │ fd = 4             │
+└─────────┬──────────┘          └─────────┬──────────┘
+          │                               │
+          └──────────────┬────────────────┘
+                         │
+                         ▼
+             ┌──────────────────────┐
+             │ Shared Memory Object │
+             │                      │
+             │    /shared_buffer    │
+             └──────────────────────┘
+```
+
+Hai process có thể nhận được những file descriptor khác nhau, nhưng chúng vẫn tham chiếu đến cùng một Shared Memory Object. Đây là sự khác biệt quan trọng giữa:
+- **Object name:** Tên định danh của object.
+- **File descriptor:** Handle mà một process sử dụng để thao tác với object.
+- **Virtual Address:** Địa chỉ mà process sử dụng sau khi gọi `mmap()`.
+
+Ba thành phần này không thể thay thế cho nhau.
+
+- **Namespace có luôn được chia sẻ giữa mọi process không?:** Không nhất thiết. Trên Linux, phạm vi nhìn thấy filesystem object còn phụ thuộc vào môi trường filesystem và mount namespace. **Ví dụ**, hai process ở hai container có thể nhìn thấy hai filesystem namespace khác nhau. Nếu `/dev/shm` của chúng được mount riêng, cùng tên `/my_shm` không nhất thiết trỏ đến cùng một object. Vì vậy, điều kiện quan trọng không chỉ là hai process sử dụng cùng tên, mà còn phải có khả năng truy cập cùng namespace chứa object đó.
+
+#### 2.2.5. Trùng tên và cơ chế tạo object
+
+Khi nhiều process cùng muốn tạo một Shared Memory Object, việc xử lý tên trùng lặp rất quan trọng. POSIX cung cấp các flag như `O_CREAT` và `O_EXCL`.
+
+**Trường hợp 1:** Chỉ sử dụng `O_CREAT`:
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR, //chỉ dùng O_CREAT
+    0666
+);
+```
+
+- **Nếu object chưa tồn tại:** tạo object mới.
+- **Nếu object đã tồn tại:** mở object hiện có.
+
+**Trường hợp 2:** Sử dụng `O_CREAT | O_EXCL`:
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_EXCL | O_RDWR,
+    0666
+);
+```
+
+- **Nếu object chưa tồn tại:** tạo object mới.
+- **Nếu object đã tồn tại:** thao tác thất bại và `errno` được đặt thành `EEXIST`.
+
+Cơ chế này hữu ích khi một process cần đảm bảo rằng nó là process tạo object mới, thay vì vô tình mở một object đã được process khác tạo trước đó.
+
+#### 2.2.6. Vòng đời của tên đối tượng
+
+Tên của Shared Memory Object có vòng đời riêng, không đồng nhất với vòng đời của file descriptor hay memory mapping. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+```
+
+Sau khi tạo object, process có thể thực hiện `ftruncate(fd, 4096);`
+
+
+Tiếp theo, ánh xạ object vào Virtual Address Space:
+void *ptr = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+
+
+Sau đó, process có thể xóa tên object:
+shm_unlink("/shared_buffer");
+
+
+Điều này không đồng nghĩa với việc vùng nhớ đã được ánh xạ lập tức biến mất.
+Thao tác	Tác động
+shm_open()	Tạo hoặc mở object theo tên
+close(fd)	Đóng file descriptor
+mmap()	Tạo memory mapping trong Virtual Address Space
+munmap()	Gỡ memory mapping
+shm_unlink()	Xóa tên object khỏi namespace
+
+Sau khi shm_unlink() thành công, process khác không thể mở object bằng tên cũ nữa. Tuy nhiên, các process đang giữ tham chiếu hợp lệ hoặc mapping tới object vẫn có thể tiếp tục sử dụng nó.
+
+Kernel chỉ có thể giải phóng object khi những tham chiếu cần thiết đã được giải phóng và không còn mapping giữ object tồn tại.
+
 ### 5.5. Demand Paging
 
 Demand Paging (phân trang theo nhu cầu) là một cơ chế quản lý bộ nhớ ảo (Virtual Memory Management), trong đó hệ điều hành chỉ đưa một trang bộ nhớ (Memory Page) vào RAM khi tiến trình thực sự cần truy cập đến trang đó, thay vì nạp toàn bộ các trang vào RAM ngay từ đầu.
