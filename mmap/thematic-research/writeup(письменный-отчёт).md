@@ -1595,6 +1595,628 @@ Sau thao tác này:
 
 Nếu Process B vẫn đang mapping object, việc Process A gọi `munmap()` không ảnh hưởng đến mapping của Process B.
 
+### 2.5. Backing Storage và Page Cache trên Linux
+#### 2.5.1. Backing Storage là gì?
+
+Backing Storage (Внешнее хранилище) là nguồn lưu trữ hoặc đối tượng đứng phía sau một memory mapping (отображение в память), cung cấp nội dung dữ liệu mà Virtual Memory Mapping đại diện. Khi một process sử dụng `mmap()` để ánh xạ một Shared Memory Object, vùng địa chỉ ảo được tạo ra không tự chứa toàn bộ dữ liệu. Thay vào đó, mapping được liên kết với một backing object. Đối với POSIX Shared Memory trên Linux, backing object thông thường được triển khai thông qua `tmpfs (shmem)`, thường được mount tại `/dev/shm`. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0666
+);
+
+ftruncate(fd, 8192);
+
+void *ptr = mmap(
+    NULL,
+    8192,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Trong ví dụ này:
+- `shm_open()` tạo hoặc mở Shared Memory Object.
+- `ftruncate()` thiết lập kích thước object là 8192 bytes.
+- `mmap()` tạo mapping cho phép process truy cập object.
+- `tmpfs/shmem` cung cấp cơ chế backing cho dữ liệu của object.
+
+Có thể hình dung:
+
+```
+             Process A
+        Virtual Address Space
+        ┌──────────────────────┐
+        │                      │
+        │         VMA          │
+        │                      │
+        │     mmap()           │
+        └──────────┬───────────┘
+                   │
+                   │ Mapping
+                   ▼
+        ┌──────────────────────┐
+        │ Shared Memory Object │
+        │                      │
+        │ /shared_buffer       │
+        │ Size: 8192 bytes     │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │     tmpfs / shmem    │
+        │                      │
+        │     Backing Storage  │
+        └──────────────────────┘
+```
+
+> [!NOTE]
+> **Cần phân biệt:** Backing Storage không nhất thiết là ổ đĩa vật lý. Với POSIX Shared Memory trên Linux, `tmpfs` chủ yếu sử dụng bộ nhớ RAM và có thể sử dụng swap khi cần.
+
+#### 2.5.2. `tmpfs` và `shmem` trong Linux
+
+Để hiểu cách POSIX Shared Memory hoạt động bên trong Linux, cần phân biệt `tmpfs` và `shmem`.
+- `tmpfs` là một filesystem sử dụng cơ chế quản lý bộ nhớ ảo của kernel để lưu trữ dữ liệu. Nội dung của nó thường được giữ trong RAM, nhưng các trang có thể được đưa ra swap.
+- `shmem` là tên thường được sử dụng trong Linux Kernel cho cơ chế `Shared Memory filesystem (Файловая система в разделяемой памяти)` và các thành phần triển khai liên quan.
+
+Trên Linux, POSIX Shared Memory thường được triển khai dựa trên `shmem/tmpfs`. Ví dụ:
+
+```
+findmnt /dev/shm
+```
+
+Kết quả có thể tương tự:
+
+```
+TARGET   SOURCE FSTYPE OPTIONS
+/dev/shm tmpfs  tmpfs  rw,nosuid,nodev,inode64
+```
+
+Điều này cho thấy `/dev/shm` là mount point của filesystem có loại `tmpfs`.
+
+Mô hình:
+
+```
+                  Linux Kernel
+             ┌─────────────────────┐
+             │                     │
+             │       VFS           │
+             │                     │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │      tmpfs          │
+             │                     │
+             │      shmem          │
+             │                     │
+             └──────────┬──────────┘
+                        │
+                        ▼
+             ┌─────────────────────┐
+             │ Shared Memory       │
+             │ Objects             │
+             └─────────────────────┘
+```
+
+> [!NOTE]
+> **Một điểm cần lưu ý:** Không nên mô tả tmpfs như một RAM disk truyền thống có toàn bộ dung lượng được cấp phát ngay từ đầu. `tmpfs` quản lý dữ liệu theo nhu cầu, sử dụng cơ chế bộ nhớ ảo và có thể sử dụng swap.
+
+#### 2.5.3. Page Cache là gì?
+
+**Page Cache** là cơ chế caching dữ liệu của filesystem trong bộ nhớ RAM, giúp kernel quản lý và truy cập nội dung của các file thông qua các trang bộ nhớ.
+
+Thông thường, khi một process đọc dữ liệu từ file, kernel có thể đưa dữ liệu vào Page Cache để những lần truy cập tiếp theo không phải đọc lại từ thiết bị lưu trữ.
+
+Ví dụ với file thông thường:
+
+```
+             Process
+                │
+                │ read()
+                ▼
+             VFS
+                │
+                ▼
+           Page Cache
+                │
+                ▼
+         Storage Device
+```
+
+Tuy nhiên, với `tmpfs`, cần hiểu thêm một điểm là dữ liệu của `tmpfs` không nhất thiết phải được đọc từ một thiết bị lưu trữ như HDD hoặc SSD. `tmpfs` sử dụng các trang bộ nhớ được quản lý bởi kernel, và các trang này có thể được swap out khi cần. Đối với Shared Memory trên Linux, các trang dữ liệu được quản lý bởi cơ chế shmem, có liên hệ với page cache infrastructure của kernel. Do đó, khi nghiên cứu POSIX Shared Memory, Page Cache không nên được hiểu đơn giản là một bộ đệm dữ liệu đọc từ ổ đĩa.
+
+#### 2.5.4. `struct address_space` và mối liên hệ với Page Cache
+
+Trong Linux Kernel, cấu trúc `struct address_space` đóng vai trò quan trọng trong việc quản lý các trang dữ liệu liên kết với một filesystem object. Định nghĩa nằm trong:
+
+```
+include/linux/fs.h
+```
+
+Cấu trúc này đại diện cho một address space gắn với inode, đồng thời quản lý các trang dữ liệu được cache hoặc lưu giữ cho object đó. Một số thành phần đáng chú ý về mặt kiến trúc:
+
+<div align="center">
+
+| Thành phần             | Vai trò                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| `struct address_space` | Quản lý address space của dữ liệu thuộc một object            |
+| `i_pages`              | XArray quản lý các folio và một số entry liên quan theo index |
+| `a_ops`                | Các address-space operations của filesystem                   |
+| `host`                 | Inode liên kết với address space                              |
+
+</div>
+
+Trong Linux, `struct file` có trường `f_mapping` trỏ tới `struct address_space` tương ứng. Với file-backed mapping, VMA có thể liên kết tới `struct file` thông qua `vm_file`. Mô hình khái quát:
+
+```
+              Process A
+          Virtual Address Space
+          ┌─────────────────────┐
+          │        VMA          │
+          │                     │
+          │      vm_file        │
+          └──────────┬──────────┘
+                     │
+                     ▼
+              ┌────────────┐
+              │ struct file│
+              │            │
+              │ f_mapping ─┼──────┐
+              └────────────┘      │
+                                  ▼
+                       ┌──────────────────┐
+                       │ struct address_  │
+                       │ space            │
+                       │                  │
+                       │ i_pages          │
+                       │ a_ops            │
+                       └────────┬─────────┘
+                                │
+                                ▼
+                         Managed Folios
+                                │
+                                ▼
+                         Physical Memory
+```
+
+Đây là mô hình khái niệm. `struct address_space` không phải một vùng RAM chứa dữ liệu, nó là cấu trúc metadata quản lý các trang dữ liệu thuộc object.
+
+- **Vai trò của `i_pages`:** `i_pages` là XArray được sử dụng để quản lý các entry theo chỉ số trang trong address space. Ví dụ, giả sử Shared Memory Object có ba trang:
+
+  <div align="center">
+
+  | Page index | Object offset | Nội dung               |
+  | ---------- | ------------- | ---------------------- |
+  | 0          | 0             | Dữ liệu trang thứ nhất |
+  | 1          | 4096          | Dữ liệu trang thứ hai  |
+  | 2          | 8192          | Dữ liệu trang thứ ba   |
+
+  </div>
+
+  Các trang được quản lý theo index tương ứng trong address space. Điều này cho phép kernel tìm kiếm và quản lý dữ liệu theo offset của object thay vì phụ thuộc vào Virtual Address của một process cụ thể.
+
+> [!IMPORTANT]
+> **Đây là điểm rất quan trọng:** Page Cache được tổ chức theo backing object và offset, không được tổ chức theo địa chỉ ảo riêng của từng process.
+
+#### 2.5.5. `struct page` và `struct folio`
+
+Khi nghiên cứu Page Cache trên các phiên bản Linux hiện đại, cần phân biệt `struct page` với `struct folio`.
+
+- **A.`struct page`:** `struct page` là cấu trúc metadata mà Linux sử dụng để quản lý các đơn vị trang bộ nhớ vật lý. Nó không chứa toàn bộ dữ liệu của trang theo nghĩa một cấu trúc C có mảng byte đại diện cho nội dung trang. Thay vào đó, nó chứa những thông tin quản lý như trạng thái, tham chiếu và quan hệ với các cơ chế quản lý bộ nhớ khác.
+
+- **B. `struct folio`:** `struct folio` là abstraction được Linux phát triển để quản lý một hoặc nhiều trang vật lý liền kề như một đơn vị thống nhất. Một folio có thể tương ứng với:
+  - Một base page.
+  - Nhiều base page liên tiếp, trong trường hợp folio lớn.
+
+  **Ví dụ:**
+
+  ```
+  Folio kích thước 4 KiB:
+
+  ┌────────────────────────┐
+  │      Base Page 0       │
+  └────────────────────────┘
+
+
+  Folio kích thước 16 KiB:
+
+  ┌──────────┬──────────┬──────────┬──────────┐
+  │ Page 0   │ Page 1   │ Page 2   │ Page 3   │
+  └──────────┴──────────┴──────────┴──────────┘
+                   │
+                   ▼
+            Một Folio 16 KiB
+  ```
+
+  Trên hệ thống có base page 4 KiB, folio 16 KiB ở ví dụ trên quản lý bốn base pages. Trong mã nguồn Linux hiện đại, nhiều thao tác Page Cache sử dụng `struct folio` thay vì thao tác trực tiếp trên từng `struct page`.
+
+> [!NOTE]
+> **Điểm cần nhớ:** `struct folio` không phải một loại bộ nhớ vật lý khác. Nó là abstraction ở tầng quản lý bộ nhớ của kernel.
+
+## 2.5.6. Demand Paging: Khi nào Backing Pages được đưa vào RAM?
+
+Một trong những đặc điểm quan trọng của POSIX Shared Memory trên Linux là việc gọi `mmap()` không đồng nghĩa với việc toàn bộ dữ liệu đã được cấp phát và đưa vào RAM ngay lập tức.
+
+Ví dụ:
+
+```
+ftruncate(fd, 16384);
+
+void *ptr = mmap(
+    NULL,
+    16384,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Giả sử hệ thống sử dụng base page 4096 bytes. Object có kích thước `16384 / 4096 = 4 pages`. Sau khi `mmap()` thành công, kernel đã thiết lập memory mapping. Tuy nhiên, các trang dữ liệu có thể chưa được cấp phát vật lý. Khi process truy cập một địa chỉ thuộc mapping, CPU có thể phát sinh Page Fault nếu Page Table chưa có mapping hợp lệ cho địa chỉ đó. Linux xử lý Page Fault và tìm cách lấy hoặc tạo trang backing tương ứng. Quy trình khái quát:
+
+```
+        Process truy cập Virtual Address
+                     │
+                     ▼
+              CPU / MMU
+                     │
+                     ▼
+             Page Table Lookup
+                     │
+             Không có PTE hợp lệ
+                     │
+                     ▼
+                 Page Fault
+                     │
+                     ▼
+             Linux Kernel MM
+                     │
+                     ▼
+             Kiểm tra VMA
+                     │
+                     ▼
+          Xác định backing object
+                     │
+                     ▼
+          Tìm trang trong shmem
+                     │
+             ┌───────┴────────┐
+             │                │
+          Đã có trang      Chưa có trang
+             │                │
+             ▼                ▼
+        Tái sử dụng       Cấp phát trang
+        trang phù hợp     hoặc xử lý swap
+             │                │
+             └───────┬────────┘
+                     ▼
+              Thiết lập PTE
+                     │
+                     ▼
+            Tiếp tục instruction
+```
+
+Đây là sơ đồ khái quát. Các nhánh xử lý thực tế còn phụ thuộc vào trạng thái trang, quyền truy cập, loại fault và trạng thái swap. **Ví dụ** Giả sử process chỉ thực hiện:
+
+```c
+void *ptr = mmap(...);
+```
+
+Nhưng không đọc hoặc ghi vào vùng nhớ. Có thể mapping đã tồn tại trong VMA nhưng chưa có các physical pages tương ứng được đưa vào RAM. Sau đó, process thực hiện:
+
+```c
+((char *)ptr)[0] = 'A';
+```
+
+Thao tác ghi có thể gây Page Fault. Kernel xử lý fault, cấp phát hoặc tìm trang backing phù hợp, thiết lập mapping trong Page Table và cho phép instruction tiếp tục. Vì vậy, cần phân biệt:
+
+<div align="center">
+
+| Trạng thái            | Ý nghĩa                                           |
+| --------------------- | ------------------------------------------------- |
+| Object đã tồn tại     | Shared Memory Object đã được tạo                  |
+| VMA đã tồn tại        | Mapping đã được thiết lập                         |
+| Page Cache có folio   | Trang backing đã được quản lý trong address space |
+| PTE đã được thiết lập | Virtual Page đã có mapping trong Page Table       |
+| Trang resident        | Dữ liệu hiện đang nằm trong RAM                   |
+
+</div>
+
+Những trạng thái này có liên quan nhưng không đồng nghĩa với nhau.
+
+## 2.5.7. Cơ chế chia sẻ Backing Pages giữa nhiều Process
+
+Đây là phần kết nối trực tiếp giữa Page Cache và `MAP_SHARED`. Giả sử Process A và Process B cùng mở một Shared Memory Object:
+
+```c
+// Process A
+int fd_a = shm_open("/shared_buffer", O_CREAT | O_RDWR, 0666);
+
+// Process B
+int fd_b = shm_open("/shared_buffer", O_RDWR);
+```
+
+Cả hai process đều gọi:
+
+```c
+mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Sau khi các trang tương ứng được fault-in, hai mapping có thể cùng tham chiếu đến một backing page.
+
+```
+                  Process A
+             Virtual Address Space
+             ┌────────────────────┐
+             │       VMA A        │
+             │                    │
+             │    Virtual Page    │
+             └─────────┬──────────┘
+                       │
+                       ▼
+                 Page Table A
+                       │
+                       │
+                       ▼
+              ┌─────────────────┐
+              │                 │
+              │ Physical Page 0 │
+              │                 │
+              └─────────────────┘
+                       ▲
+                       │
+                       │
+                 Page Table B
+                       ▲
+                       │
+             ┌─────────┴──────────┐
+             │       VMA B        │
+             │                    │
+             │    Virtual Page    │
+             └────────────────────┘
+                  Process B
+             Virtual Address Space
+```
+
+Về mặt quản lý backing object:
+
+```
+              Shared Memory Object
+                        │
+                        ▼
+                struct address_space
+                        │
+                        ▼
+                  Page Cache
+                        │
+                        ▼
+                Physical Page 0
+```
+
+Khi Process A ghi:
+
+```c
+((char *)ptr_a)[0] = 'A';
+```
+
+Process B có thể đọc:
+
+```c
+printf("%c\n", ((char *)ptr_b)[0]);
+```
+
+Kết quả:
+
+```
+A
+```
+
+Nguyên nhân là hai mapping cùng truy cập dữ liệu backing tương ứng. Không có yêu cầu hai process phải có cùng Virtual Address. Điều kiện quan trọng là chúng phải truy cập đúng cùng object và cùng offset.
+
+### Phân biệt `MAP_SHARED` và `MAP_PRIVATE`
+
+<div align="centrer">
+
+| Đặc điểm  | `MAP_SHARED` | `MAP_PRIVATE` |
+| - | -| - |
+| Quan hệ với backing object | Mapping chia sẻ các thay đổi theo cơ chế shared mapping | Mapping private, sử dụng Copy-on-Write khi cần |
+| Ghi dữ liệu | Thay đổi có thể được quan sát qua mapping khác của cùng object | Thay đổi không được công bố như thay đổi của backing object |
+| Cơ chế COW  | Không phải cơ chế ghi mặc định  | Có thể xảy ra khi ghi  |
+| Dùng cho IPC | Phù hợp | Không phù hợp nếu cần chia sẻ thay đổi |
+
+</div>
+
+> [!NOTE]
+> **Lưu ý:** `MAP_SHARED` không tự cung cấp synchronization. Hai process cùng ghi một vùng nhớ mà không có cơ chế đồng bộ phù hợp vẫn có thể gây race condition.
+
+## 2.5.8. `tmpfs`, `Swap` và vòng đời Physical Pages
+
+Một điểm dễ hiểu nhầm là `tmpfs` sử dụng RAM nên dữ liệu của nó luôn phải nằm trong RAM. Điều này không chính xác. `tmpfs` sử dụng cơ chế quản lý bộ nhớ ảo của Linux. Khi hệ thống chịu áp lực bộ nhớ, các trang dữ liệu phù hợp có thể được swap out. Có thể mô hình hóa:
+
+```
+             Shared Memory Object
+                       │
+                       ▼
+                shmem / tmpfs
+                       │
+                       ▼
+                Page Cache
+                       │
+                       ▼
+                Physical Pages
+                       │
+                Memory Pressure
+                       │
+                       ▼
+                Swap Mechanism
+                       │
+                       ▼
+                 Swap Storage
+```
+
+Khi một trang bị swap out:
+- Nội dung trang được lưu vào swap.
+- Trang vật lý có thể được giải phóng để phục vụ mục đích khác.
+- Kernel quản lý thông tin cần thiết để tìm lại nội dung trang.
+- Khi process truy cập lại trang đó, kernel có thể phải đưa nội dung từ swap trở lại RAM.
+
+**Điều này có nghĩa:** `tmpfs` không đồng nghĩa với việc dữ liệu được đảm bảo luôn resident trong RAM. Đặc biệt, cần phân biệt:
+
+<div align="center">
+
+| Thành phần      | Vai trò                                                  |
+| --------------- | -------------------------------------------------------- |
+| tmpfs           | Filesystem sử dụng cơ chế bộ nhớ ảo                      |
+| Page Cache      | Cơ chế quản lý các trang dữ liệu của filesystem          |
+| Physical Memory | RAM thực tế                                              |
+| Swap            | Không gian lưu trữ hỗ trợ khi trang bộ nhớ được swap out |
+
+</div>
+
+Không phải mọi Page Fault đều dẫn đến đọc dữ liệu từ swap. Nếu trang chưa từng được cấp phát, kernel có thể tạo một trang mới. Nếu trang đã có trong RAM, kernel có thể sử dụng lại trang đó.
+
+## 2.5.9. Thực nghiệm: Quan sát Shared Memory qua `/proc` và `smaps`
+
+Để hiểu quan hệ giữa VMA, Resident Memory và Shared Memory, có thể quan sát thông tin của process thông qua `/proc`. Tạo chương trình:
+
+```c
+//shm_test.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+int main(void)
+{
+    const char *name = "/shm_research";
+
+    int fd = shm_open(
+        name,
+        O_CREAT | O_RDWR,
+        0600
+    );
+
+    if (fd == -1) {
+        perror("shm_open");
+        return 1;
+    }
+
+    if (ftruncate(fd, 16384) == -1) {
+        perror("ftruncate");
+        close(fd);
+        shm_unlink(name);
+        return 1;
+    }
+
+    char *ptr = mmap(
+        NULL,
+        16384,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED,
+        fd,
+        0
+    );
+
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        shm_unlink(name);
+        return 1;
+    }
+
+    printf("PID: %d\n", getpid());
+    printf("Address: %p\n", (void *)ptr);
+    printf("Shared Memory: %s\n", name);
+
+    getchar();
+
+    ptr[0] = 'A';
+
+    getchar();
+
+    munmap(ptr, 16384);
+    close(fd);
+    shm_unlink(name);
+
+    return 0;
+}
+```
+
+Biên dịch và chạy `./shm_test`, kết quả :
+
+<p align="center">
+<img src="image3.png">
+</p>
+
+Trong một terminal khác, sử dụng PID được in ra:
+
+```
+cat /proc/5380/maps
+```
+
+Hoặc:
+
+```
+cat /proc/5380/smaps
+```
+
+Tìm VMA tương ứng với Shared Memory Object. Ví dụ, một phần thông tin có dạng:
+
+<p align="center">
+<img src="image5.png">
+</p>
+
+Ý nghĩa các trường:
+
+<div align="center">
+
+| Trường          | Ý nghĩa                                                               |
+| --------------- | --------------------------------------------------------------------- |
+| `Size`          | Kích thước vùng VMA                                                   |
+| `Rss`           | Tổng dung lượng trang resident được tính cho mapping                  |
+| `Pss`           | Proportional Set Size, phân bổ dung lượng trang dùng chung theo tỷ lệ |
+| `Shared_Clean`  | Trang resident được phân loại shared và clean                         |
+| `Shared_Dirty`  | Trang resident được phân loại shared và dirty                         |
+| `Private_Dirty` | Trang resident được phân loại private và dirty                        |
+
+</div>
+
+Một số lưu ý khi phân tích:
+
+- `Size` không đồng nghĩa với dung lượng RAM đang sử dụng.
+- `Rss` chỉ phản ánh những trang resident, không phản ánh toàn bộ kích thước object.
+- `Pss` phân bổ tỷ lệ các trang dùng chung cho từng process.
+- `Shared_Dirty` không có nghĩa dữ liệu đã được ghi xuống HDD/SSD.
+- `smaps` là thông tin thống kê mapping, không phải bản đồ đầy đủ của Page Cache.
+
+Thử nghiệm Demand Paging. Trong chương trình trên, lần `getchar()` đầu tiên xảy ra trước thao tác ghi:
+
+```c
+getchar();
+
+ptr[0] = 'A';
+```
+
+Có thể kiểm tra `/proc/<PID>/smaps` khi chương trình đang dừng tại `getchar()` đầu tiên, sau đó tiếp tục chương trình và kiểm tra lại tại `getchar()` thứ hai.Điều này giúp quan sát sự thay đổi của RSS và các trường liên quan khi mapping được truy cập.
+
+Tuy nhiên, không nên kỳ vọng RSS luôn tăng đúng 4 KiB. Kernel có thể cấp phát, fault-in hoặc xử lý trang theo trạng thái hiện có, số liệu còn chịu ảnh hưởng từ các lần truy cập và cơ chế quản lý bộ nhớ.
+
+
 ### 5.5. Demand Paging
 
 Demand Paging (phân trang theo nhu cầu) là một cơ chế quản lý bộ nhớ ảo (Virtual Memory Management), trong đó hệ điều hành chỉ đưa một trang bộ nhớ (Memory Page) vào RAM khi tiến trình thực sự cần truy cập đến trang đó, thay vì nạp toàn bộ các trang vào RAM ngay từ đầu.
