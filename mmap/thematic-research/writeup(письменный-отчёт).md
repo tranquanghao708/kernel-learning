@@ -26,14 +26,21 @@
     - [2.2.4. Namespace và phạm vi truy cập giữa các Process](#224-namespace-và-phạm-vi-truy-cập-giữa-các-process)
     - [2.2.5. Trùng tên và cơ chế tạo object](#225-trùng-tên-và-cơ-chế-tạo-object)
     - [2.2.6. Vòng đời của tên đối tượng](#226-vòng-đời-của-tên-đối-tượng)
-  - [2.3. File descriptor và vòng đời đối tượng](#23-file-descriptor-và-vòng-đời-đối-tượng)
+  - [2.3. File Descriptor và vòng đời đối tượng (File Descriptor and Object Lifecycle)](#23-file-descriptor-và-vòng-đời-đối-tượng-file-descriptor-and-object-lifecycle)
     - [2.3.1. File Descriptor trong POSIX Shared Memory là gì?](#231-file-descriptor-trong-posix-shared-memory-là-gì)
     - [2.3.2. Kiến trúc quản lý File Descriptor trong Linux](#232-kiến-trúc-quản-lý-file-descriptor-trong-linux)
     - [2.3.3. Quan hệ giữa File Descriptor và Shared Memory Object](#233-quan-hệ-giữa-file-descriptor-và-shared-memory-object)
     - [2.3.4. Quan hệ giữa `close()` và Shared Memory Object](#234-quan-hệ-giữa-close-và-shared-memory-object)
     - [2.3.5. Quan hệ giữa `shm_unlink()` và vòng đời đối tượng](#235-quan-hệ-giữa-shm-unlink-và-vòng-đời-đối-tượng)
     - [2.3.6. `fork()` và `dup()` ảnh hưởng thế nào đến File Descriptor?](#236-fork-và-dup-ảnh-hưởng-thế-nào-đến-file-descriptor)
-  - 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area 
+  - [2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area (VMA)](#24-quan-hệ-giữa-shared-memory-object-và-virtual-memory-area-vma)
+    - [2.4.1. Virtual Memory Area là gì?](#241-virtual-memory-area-là-gì)
+    - [2.4.2. Quan hệ giữa Shared Memory Object và VMA](#242-quan-hệ-giữa-shared-memory-object-và-vma)
+    - [2.4.3. Một Shared Memory Object có thể được ánh xạ vào nhiều VMA](#243-một-shared-memory-object-có-thể-được-ánh-xạ-vào-nhiều-vma)
+    - [2.4.4. Quan hệ giữa VMA, Page Table và Physical Memory](#244-quan-hệ-giữa-vma-page-table-và-physical-memory)
+    - [2.4.5. Trường `vm_file` và `vm_pgoff` trong `struct vm_area_struct`](#245-trường-vm_file-và-vm_pgoff-trong-struct_vm_area_struct)
+    - [2.4.6. Một Object có thể có nhiều VMA trong cùng một Process không?](#246-một-object-có-thể-có-nhiều-vma-trong-cùng-một-process-không)
+    - [2.4.7. `munmap()` và tác động lên VMA](#247-munmap-và-tác-động-lên-vma)
   - 2.5. Backing storage và Page Cache trên Linux
 - 3.`shm_open()`
   - 3.1. Function prototype
@@ -1444,7 +1451,7 @@ Khi Process A ghi dữ liệu vào vùng nhớ, Process B có thể quan sát đ
   <div align="center">
 
   $$\Large
-  vm\_pgoff = \frac{4096}{4096}=1
+  \text{vm_pgoff} = \frac{4096}{4096}=1
   $$
 
   </div>
@@ -1465,9 +1472,13 @@ Khi Process A ghi dữ liệu vào vùng nhớ, Process B có thể quan sát đ
 
   **Lúc này:**
 
+  <div align="center">
+
   $$\Large
-  vm\_pgoff = \frac{8192}{4096}=2
+  \text{vm_pgoff} = \frac{8192}{4096}=2
   $$
+
+  </div>
 
 > [!NOTE]
 > **Lưu ý:** Trường `vm_pgoff` được tính theo page unit, còn tham số offset truyền cho `mmap()` được tính bằng byte.
