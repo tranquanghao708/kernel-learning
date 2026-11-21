@@ -1122,7 +1122,7 @@ Sau khi gọi `close(fd)`, liên kết thông qua `FD` bị loại bỏ, nhưng 
 Hai cơ chế này giúp hiểu sâu hơn về cách Linux quản lý `FD`.
 - **A. `fork()`:** Khi process gọi `fork()`, process con được tạo ra với một bản sao của file descriptor table. **Ví dụ:**
 
-  ```
+  ```c
   int fd = shm_open(
       "/shared_buffer",
       O_CREAT | O_RDWR,
@@ -1164,7 +1164,7 @@ Hai cơ chế này giúp hiểu sâu hơn về cách Linux quản lý `FD`.
 
 - **B. `dup()`:** Hàm `dup()` tạo một file descriptor mới tham chiếu tới cùng open file description với `FD` ban đầu. **Ví dụ:**
 
-  ```
+  ```c
   int fd1 = shm_open(
       "/shared_buffer",
       O_CREAT | O_RDWR,
@@ -1194,7 +1194,7 @@ Hai cơ chế này giúp hiểu sâu hơn về cách Linux quản lý `FD`.
                     ▼
              Shared Memory
                  Object
-  ``
+  ```
 
   Khác với hai lần gọi `shm_open()` độc lập, `dup()` tạo `FD` mới nhưng vẫn tham chiếu tới cùng open file description.
 
@@ -1207,6 +1207,382 @@ Hai cơ chế này giúp hiểu sâu hơn về cách Linux quản lý `FD`.
 | `fork()`	| `FD` tương ứng ở cha và con cùng tham chiếu open file description |
 
 </div>
+
+### 2.4. Quan hệ giữa Shared Memory Object và Virtual Memory Area (VMA)
+#### 2.4.1. Virtual Memory Area là gì?
+
+Virtual Memory Area (VMA) là một vùng địa chỉ liên tục trong Virtual Address Space của một process, được Linux Kernel sử dụng để quản lý các thuộc tính của vùng nhớ đó. Trong Linux, VMA được biểu diễn bằng cấu trúc `struct vm_area_struct;`. Mỗi VMA mô tả một vùng nhớ với những thông tin như:
+- Phạm vi địa chỉ ảo (`vm_start`, `vm_end`).
+- Quyền truy cập và các thuộc tính mapping (`vm_flags`).
+- File hoặc object backing mapping (`vm_file`).
+- Offset bên trong backing object (`vm_pgoff`).
+- Các thông tin quản lý liên quan đến memory mapping.
+
+**Ví dụ**, khi process gọi:
+
+```c
+void *ptr = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Kernel tạo một memory mapping tương ứng trong Virtual Address Space của process. Mapping này được biểu diễn bằng một VMA hoặc được kết hợp với một VMA hiện có nếu các điều kiện cho phép. **Ví dụ minh họa:**
+
+```c
+             Process A
+       Virtual Address Space
+┌──────────────────────────────┐
+│                              │
+│  0x00007fff00000000          │
+│                              │
+│  ┌────────────────────────┐  │
+│  │       VMA              │  │
+│  │                        │  │
+│  │  vm_start              │  │
+│  │  vm_end                │  │
+│  │  vm_flags              │  │
+│  │  vm_file               │  │
+│  │  vm_pgoff              │  │
+│  └────────────────────────┘  │
+│                              │
+└──────────────────────────────┘
+```
+
+VMA không chứa toàn bộ dữ liệu của vùng nhớ. Nó mô tả cách kernel quản lý một khoảng địa chỉ ảo và cách vùng địa chỉ đó liên kết với backing object.
+
+#### 2.4.2. Quan hệ giữa Shared Memory Object và VMA
+
+Shared Memory Object và VMA là hai thành phần thuộc hai tầng quản lý khác nhau.
+- **Shared Memory Object (Объект разделяемой памяти):** Đại diện cho đối tượng bộ nhớ dùng chung, cung cấp backing storage cho các memory mapping.
+- **VMA (область виртуальной памяти - virtual memory area):** Đại diện cho vùng địa chỉ ảo mà một process sử dụng để truy cập object đó.
+
+Khi một process gọi `mmap()` với file descriptor của Shared Memory Object, kernel thiết lập mối liên hệ giữa VMA và object. Trên Linux, với file-backed mapping, trường `vm_file` trong `struct vm_area_struct` giữ tham chiếu tới struct file tương ứng. Có thể mô hình hóa:
+
+```
+              Process A
+       Virtual Address Space
+       ┌──────────────────────┐
+       │                      │
+       │        VMA A         │
+       │                      │
+       │ vm_start             │
+       │ vm_end               │
+       │ vm_flags             │
+       │ vm_file ─────────────┼─────┐
+       │ vm_pgoff             │     │
+       └──────────────────────┘     │
+                                    ▼
+                             ┌────────────┐
+                             │ struct file│
+                             └─────┬──────┘
+                                   │
+                                   ▼
+                         Shared Memory Object
+```
+
+Điều quan trọng là VMA không phải Shared Memory Object. VMA chỉ mô tả mapping của object trong một process.
+
+#### 2.4.3. Một Shared Memory Object có thể được ánh xạ vào nhiều VMA
+
+Đây là đặc điểm quan trọng nhất của cơ chế Shared Memory. Một Shared Memory Object có thể được nhiều process ánh xạ vào Virtual Address Space của chúng. **Ví dụ:**
+- Process A gọi `mmap()` và nhận địa chỉ `0x7f1000000000`.
+- Process B gọi `mmap()` và nhận địa chỉ `0x7f2000000000`.
+
+Hai địa chỉ này khác nhau, nhưng cả hai mapping có thể cùng tham chiếu đến một Shared Memory Object.
+
+```
+                  Process A
+           Virtual Address Space
+       ┌──────────────────────────┐
+       │                          │
+       │  VMA A                   │
+       │  0x7f1000000000          │
+       │           │              │
+       └───────────┼──────────────┘
+                   │
+                   │
+                   ▼
+          ┌─────────────────────┐
+          │                     │
+          │ Shared Memory       │
+          │ Object              │
+          │                     │
+          └─────────────────────┘
+                   ▲
+                   │
+                   │
+       ┌───────────┼──────────────┐
+       │           │              │
+       │  VMA B                   │
+       │  0x7f2000000000          │
+       │                          │
+       └──────────────────────────┘
+           Virtual Address Space
+                  Process B
+```
+
+Sơ đồ trên thể hiện quan hệ giữa các mapping và object. Trong thực tế, kernel còn quản lý backing pages, page tables và các tham chiếu liên quan.
+
+- **Tại sao địa chỉ ảo lại khác nhau?:** Mỗi process có Virtual Address Space riêng. Do đó, cùng một backing object có thể được ánh xạ tại những địa chỉ ảo khác nhau trong từng process. **Ví dụ:**
+
+  <div align="center">
+
+  | Thành phần |	Process A |	Process B |
+  |-|-|-|
+  | Shared Memory Object |	`/shared_buffer` |	`/shared_buffer` |
+  | File Descriptor |	3 |	4 |
+  | VMA |	VMA A |	VMA B |
+  | Virtual Address |	`0x7f1000000000` |	`0x7f2000000000` |
+  | Backing Object |	Chung |	Chung |
+
+  </div>
+
+  Đây chính là lý do hai process không cần sử dụng cùng một địa chỉ ảo để chia sẻ dữ liệu. Virtual Address khác nhau không có nghĩa là dữ liệu vật lý khác nhau.
+
+#### 2.4.4. Quan hệ giữa VMA, Page Table và Physical Memory
+
+Để hiểu đầy đủ cơ chế, cần phân biệt ba thành phần (VMA, Page Table và Physical Memory). Chúng đảm nhiệm ba nhiệm vụ khác nhau. Trong đó:
+- **VMA (область виртуальной памяти - virtual memory area):** Mô tả vùng địa chỉ ảo và thuộc tính mapping
+- **Page Table (Таблица страниц):** Ánh xạ Virtual Page sang Physical Page
+- **Physical Memory (Физическая память):** Chứa dữ liệu thực tế được CPU truy cập
+
+**Ví dụ:** Giả sử Shared Memory Object có kích thước 8192 bytes, tương ứng hai trang 4096 bytes trên hệ thống sử dụng page size 4 KiB. Process A và Process B cùng ánh xạ object đó.
+
+```
+             Process A                       Process B
+       Virtual Address Space           Virtual Address Space
+    ┌──────────────────────┐         ┌──────────────────────┐
+    │ VMA A                │         │ VMA B                │
+    │                      │         │                      │
+    │ 0x100000             │         │ 0x500000             │
+    │                      │         │                      │
+    └──────────┬───────────┘         └──────────┬───────────┘
+               │                                │
+               ▼                                ▼
+       ┌───────────────┐                ┌───────────────┐
+       │ Page Table A  │                │ Page Table B  │
+       │               │                │               │
+       │ VPN 0 ───┐    │                │ VPN 0 ───┐    │
+       │ VPN 1 ─┐ │    │                │ VPN 1 ─┐ │    │
+       └────────┼─┼────┘                └────────┼─┼────┘
+                │ │                              │ │
+                │ └──────────────┐               │ └──────────────┐
+                │                │               │                │
+                ▼                ▼               ▼                ▼
+             ┌─────────┐      ┌─────────┐     ┌─────────┐      ┌─────────┐
+             │ Page 0  │      │ Page 1  │     │ Page 0  │      │ Page 1  │
+             └─────────┘      └─────────┘     └─────────┘      └─────────┘
+                ▲                ▲               ▲                ▲
+                └────────────────┴───────────────┴────────────────┘
+                                 │
+                                 ▼
+                      Shared Backing Pages
+                      ┌───────────────────┐
+                      │ Physical Page 0   │
+                      │ Physical Page 1   │
+                      └───────────────────┘
+```
+
+Trong trường hợp các trang đã được fault-in và cả hai process cùng ánh xạ những offset tương ứng, các Page Table Entry của chúng có thể trỏ đến cùng physical pages. **Ví dụ:**
+
+```
+Process A:
+Virtual Address 0x100000 ──┐
+                           │
+                           ▼
+                    Physical Page 0
+                           ▲
+                           │
+Process B:                 │
+Virtual Address 0x500000 ──┘
+```
+
+Khi Process A ghi dữ liệu vào vùng nhớ, Process B có thể quan sát được thay đổi thông qua mapping tương ứng. Đây là nền tảng của cơ chế chia sẻ dữ liệu bằng `MAP_SHARED`.
+
+> [!NOTE]
+> **Lưu ý:** VMA tồn tại không có nghĩa tất cả Page Table Entry và Physical Page tương ứng đã được tạo ngay lập tức. Linux có thể sử dụng Demand Paging để thiết lập các trang khi process truy cập chúng.
+
+#### 2.4.5. Trường `vm_file` và `vm_pgoff` trong `struct vm_area_struct`
+
+Đây là hai trường đáng chú ý khi nghiên cứu quan hệ giữa VMA và Shared Memory Object ở cấp Linux Kernel.
+
+- **A. `vm_file`:** `struct file *vm_file;`. Trường này lưu con trỏ tới struct file tương ứng với file-backed mapping. Trong trường hợp POSIX Shared Memory, `vm_file` giúp liên kết VMA với file object đại diện cho Shared Memory Object. Có thể hiểu:
+
+  ```
+  VMA
+   │
+   └── vm_file
+         │
+         ▼
+     struct file
+         │
+         ▼
+     Shared Memory Object
+  ```
+
+  Nhờ liên kết này, kernel có thể xác định backing object mà mapping đang tham chiếu tới.
+- **B. `vm_pgoff`:** `unsigned long vm_pgoff;`. Trường này biểu diễn offset của mapping bên trong backing object, tính theo đơn vị page. **Ví dụ:**
+
+  ```
+  mmap(
+      NULL,
+      4096,
+      PROT_READ | PROT_WRITE,
+      MAP_SHARED,
+      fd,
+      4096
+  );
+  ```
+
+  Giả sử page size là 4096 bytes:
+
+  <div align="center">
+
+  $$\Large
+  vm\_pgoff = \frac{4096}{4096}=1
+  $$
+
+  </div>
+
+  Điều này có nghĩa mapping bắt đầu tại page thứ hai của object, thay vì page đầu tiên. **Ví dụ** với object có kích thước 12288 bytes:
+
+  ```
+  Shared Memory Object (12 KiB)
+  ┌──────────────┬──────────────┬──────────────┐
+  │ Page 0       │ Page 1       │ Page 2       │
+  │ Offset 0     │ Offset 4096  │ Offset 8192  │
+  └──────────────┴──────────────┴──────────────┘
+                                ▲
+                                │
+                           mmap offset
+                             8192
+  ```
+
+  **Lúc này:**
+
+  $$\Large
+  vm\_pgoff = \frac{8192}{4096}=2
+  $$
+
+> [!NOTE]
+> **Lưu ý:** Trường `vm_pgoff` được tính theo page unit, còn tham số offset truyền cho `mmap()` được tính bằng byte.
+
+#### 2.4.6. Một Object có thể có nhiều VMA trong cùng một Process không?
+
+Có. Một Shared Memory Object không bị giới hạn chỉ có một mapping trong một process. **Ví dụ**, cùng một process có thể ánh xạ cùng object hai lần:
+
+```c
+void *map_a = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+
+void *map_b = mmap(
+    NULL,
+    4096,
+    PROT_READ | PROT_WRITE,
+    MAP_SHARED,
+    fd,
+    0
+);
+```
+
+Nếu cả hai lời gọi thành công, process có hai mapping riêng biệt.
+
+```
+             Process A
+       Virtual Address Space
+       ┌────────────────────────┐
+       │                        │
+       │ VMA A                  │
+       │ map_a                  │
+       │ 0x7f1000000000         │
+       │       │                │
+       │       │                │
+       │ VMA B                  │
+       │ map_b                  │
+       │ 0x7f2000000000         │
+       │       │                │
+       └───────┼────────────────┘
+               │
+          ┌────┴────┐
+          ▼         ▼
+       ┌─────────────────┐
+       │ Shared Memory   │
+       │ Object          │
+       └─────────────────┘
+```
+
+Cả hai mapping có thể tham chiếu đến cùng một backing object và cùng offset. **Ví dụ:**
+
+```c
+((char *)map_a)[0] = 'A';
+
+printf("%c\n", ((char *)map_b)[0]);
+```
+
+Kết quả:
+
+```
+A
+```
+
+Vì cả hai mapping sử dụng `MAP_SHARED` và cùng tham chiếu đến một backing object, thao tác ghi thông qua mapping thứ nhất có thể được quan sát qua mapping thứ hai. Tuy nhiên, đây không phải cơ chế đồng bộ hóa. Nếu nhiều thread hoặc process ghi đồng thời, chương trình vẫn cần synchronization phù hợp.
+
+#### 2.4.7. `munmap()` và tác động lên VMA
+
+Hàm `munmap()` được sử dụng để gỡ một memory mapping khỏi Virtual Address Space. **Ví dụ:**
+
+```c
+munmap(map_a, 4096);
+```
+
+Sau thao tác này:
+- Mapping tương ứng không còn được process sử dụng.
+- VMA có thể bị xóa hoặc điều chỉnh nếu vùng bị gỡ chỉ là một phần của VMA.
+- Những mapping khác của cùng object vẫn có thể tồn tại.
+- Shared Memory Object không tự động bị xóa.
+
+**Ví dụ:**
+
+```
+          Trước munmap(map_a)
+
+          Process A
+    ┌──────────────────────┐
+    │ VMA A ───────────┐   │
+    │                  │   │
+    │ VMA B ────────┐  │   │
+    └───────────────│──│───┘
+                    │  │
+                    ▼  ▼
+             Shared Memory
+                 Object
+
+
+          Sau munmap(map_a)
+
+          Process A
+    ┌──────────────────────┐
+    │                      │
+    │ VMA B ───────────┐   │
+    └──────────────────│───┘
+                       │
+                       ▼
+                Shared Memory
+                    Object
+```
+
+Nếu Process B vẫn đang mapping object, việc Process A gọi `munmap()` không ảnh hưởng đến mapping của Process B.
 
 ### 5.5. Demand Paging
 
