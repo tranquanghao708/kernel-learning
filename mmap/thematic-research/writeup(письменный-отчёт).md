@@ -41,7 +41,16 @@
     - [2.4.5. Trường `vm_file` và `vm_pgoff` trong `struct vm_area_struct`](#245-trường-vm_file-và-vm_pgoff-trong-struct_vm_area_struct)
     - [2.4.6. Một Object có thể có nhiều VMA trong cùng một Process không?](#246-một-object-có-thể-có-nhiều-vma-trong-cùng-một-process-không)
     - [2.4.7. `munmap()` và tác động lên VMA](#247-munmap-và-tác-động-lên-vma)
-  - 2.5. Backing storage và Page Cache trên Linux
+  - [2.5. Backing storage và Page Cache trên Linux](#25-backing-storage-và-page-cache-trên-linux)
+    - [2.5.1. Backing Storage là gì?](#251-backing-storage-là-gì)
+    - [2.5.2. `tmpfs` và `shmem` trong Linux](#252-tmpfs-và-shmem-trong-linux)
+    - [2.5.3. Page Cache là gì?](#253-page-cache-là-gì)
+    - [2.5.4. `struct address_space` và mối liên hệ với Page Cache](#254-struct-address_space-và-mối-liên-hệ-với-page-cache)
+    - [2.5.5. `struct page` và `struct folio`](#255-struct-page-và-struct-folio)
+    - [2.5.6. Demand Paging: Khi nào Backing Pages được đưa vào RAM?](#256-demand-paging-khi-nào-backing-pages-được-đưa-vào-ram)
+    - [2.5.7. Cơ chế chia sẻ Backing Pages giữa nhiều Process](#257-cơ-chế-chia-sẻ-backing-pages-giữa-nhiều-process)
+    - [2.5.8. `tmpfs`, `Swap` và vòng đời Physical Pages](#258-tmpfs-swap-và-vòng-đời-physical-pages)
+    - [2.5.9. Thực nghiệm: Quan sát Shared Memory qua `/proc` và `smaps`](#259-thực-nghiệm-quan-sát-shared-memory-qua-proc-và-smaps)
 - 3.`shm_open()`
   - 3.1. Function prototype
   - 3.2. Tham số `name`, `oflag`, `mode`
@@ -2023,9 +2032,7 @@ Kết quả:
 A
 ```
 
-Nguyên nhân là hai mapping cùng truy cập dữ liệu backing tương ứng. Không có yêu cầu hai process phải có cùng Virtual Address. Điều kiện quan trọng là chúng phải truy cập đúng cùng object và cùng offset.
-
-### Phân biệt `MAP_SHARED` và `MAP_PRIVATE`
+Nguyên nhân là hai mapping cùng truy cập dữ liệu backing tương ứng. Không có yêu cầu hai process phải có cùng Virtual Address. Điều kiện quan trọng là chúng phải truy cập đúng cùng object và cùng offset. Phân biệt `MAP_SHARED` và `MAP_PRIVATE` :
 
 <div align="centrer">
 
@@ -2160,7 +2167,7 @@ int main(void)
 Biên dịch và chạy `./shm_test`, kết quả :
 
 <p align="center">
-<img src="image3.png">
+<img src="image/image3.png">
 </p>
 
 Trong một terminal khác, sử dụng PID được in ra:
@@ -2178,7 +2185,7 @@ cat /proc/5380/smaps
 Tìm VMA tương ứng với Shared Memory Object. Ví dụ, một phần thông tin có dạng:
 
 <p align="center">
-<img src="image5.png">
+<img src="image/image5.png">
 </p>
 
 Ý nghĩa các trường:
