@@ -2185,7 +2185,7 @@ cat /proc/5380/smaps
 Tìm VMA tương ứng với Shared Memory Object. Ví dụ, một phần thông tin có dạng:
 
 <p align="center">
-<img src="image/image5.png">
+<img src="image/image4.png">
 </p>
 
 Ý nghĩa các trường:
