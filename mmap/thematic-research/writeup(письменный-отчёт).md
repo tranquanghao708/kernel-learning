@@ -1451,7 +1451,7 @@ Khi Process A ghi dữ liệu vào vùng nhớ, Process B có thể quan sát đ
   <div align="center">
 
   $$\Large
-  \text{vm_pgoff} = \frac{4096}{4096}=1
+  \text{vm pgoff} = \frac{4096}{4096}=1
   $$
 
   </div>
@@ -1475,7 +1475,7 @@ Khi Process A ghi dữ liệu vào vùng nhớ, Process B có thể quan sát đ
   <div align="center">
 
   $$\Large
-  \text{vm_pgoff} = \frac{8192}{4096}=2
+  \text{vm pgoff} = \frac{8192}{4096}=2
   $$
 
   </div>
