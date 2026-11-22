@@ -51,7 +51,7 @@
     - [2.5.7. Cơ chế chia sẻ Backing Pages giữa nhiều Process](#257-cơ-chế-chia-sẻ-backing-pages-giữa-nhiều-process)
     - [2.5.8. `tmpfs`, `Swap` và vòng đời Physical Pages](#258-tmpfs-swap-và-vòng-đời-physical-pages)
     - [2.5.9. Thực nghiệm: Quan sát Shared Memory qua `/proc` và `smaps`](#259-thực-nghiệm-quan-sát-shared-memory-qua-proc-và-smaps)
-- 3.`shm_open()`
+- 3. `shm_open()`
   - 3.1. Function prototype
   - 3.2. Tham số `name`, `oflag`, `mode`
   - 3.3. `O_CREAT`, `O_EXCL`, `O_RDWR`
@@ -1003,6 +1003,8 @@ Hai FD có giá trị khác nhau nhưng cùng tham chiếu đến một Shared M
 
 Trong trường hợp hai process gọi `shm_open()` độc lập, mỗi lần mở có thể tạo một open file description riêng. Những struct file này vẫn có thể tham chiếu tới cùng một underlying inode/object. Đây là điểm cần phân biệt:
 
+<div align="center">
+
 | Thành phần |	Process A |	Process B |
 |-|-|-|
 | File descriptor |	3 |	4 |
@@ -1010,6 +1012,7 @@ Trong trường hợp hai process gọi `shm_open()` độc lập, mỗi lần m
 | Shared Memory Object	| Chung	| Chung |
 | Inode của object	| Chung |	Chung |
 
+</div>
 
 #### 2.3.4. Quan hệ giữa `close()` và Shared Memory Object
 
@@ -2223,6 +2226,134 @@ Có thể kiểm tra `/proc/<PID>/smaps` khi chương trình đang dừng tại 
 
 Tuy nhiên, không nên kỳ vọng RSS luôn tăng đúng 4 KiB. Kernel có thể cấp phát, fault-in hoặc xử lý trang theo trạng thái hiện có, số liệu còn chịu ảnh hưởng từ các lần truy cập và cơ chế quản lý bộ nhớ.
 
+## 3. `shm_open()`
+
+`shm_open()` là hàm thuộc POSIX Shared Memory API, được sử dụng để tạo mới hoặc mở một Shared Memory Object thông qua tên định danh. Hàm này cung cấp điểm bắt đầu để các process có thể truy cập cùng một đối tượng bộ nhớ dùng chung.
+
+### 3.1. Function prototype
+
+nó có prototype như sau:
+
+```c
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int shm_open(
+    const char *name,
+    int oflag,
+    mode_t mode
+);
+```
+
+Các tham số:
+- **name:** Tên định danh của Shared Memory Object
+- **oflag:** Các flag quy định cách mở hoặc tạo object
+- **mode:** Permission bits khi tạo object mới
+
+Giá trị trả về:
+- **Thành công:** trả về một file descriptor không âm.
+- **Thất bại:** trả về `-1` và thiết lập errno.
+
+**Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/shared_buffer",
+    O_CREAT | O_RDWR,
+    0600
+);
+
+if (fd == -1) {
+    perror("shm_open");
+    return 1;
+}
+```
+
+Nếu object chưa tồn tại, `O_CREAT` yêu cầu tạo mới. Nếu object đã tồn tại, hàm mở object đó, miễn là các quyền truy cập cho phép. Sau khi thành công, `fd` được sử dụng trong những thao tác tiếp theo như:
+- `ftruncate()` — thiết lập kích thước object.
+- `fstat()` — lấy thông tin metadata.
+- `mmap()` — ánh xạ object vào Virtual Address Space.
+- `close()` — đóng file descriptor.
+
+> [!IMPORTANT]
+> **Điểm quan trọng:** `shm_open()` không trực tiếp cấp phát một vùng Virtual Address cho process. Nó chỉ tạo hoặc mở object và trả về file descriptor. Việc ánh xạ object vào bộ nhớ ảo được thực hiện bởi `mmap()`.
+
+### 3.2. Tham số `name`, `oflag`, `mode`
+
+- **A. `name` — Tên định danh:** `name` xác định Shared Memory Object mà process muốn tạo hoặc mở. **Ví dụ:**
+
+  ```c
+  shm_open("/my_shm", O_CREAT | O_RDWR, 0600);
+  ```
+
+  Trong đó `/my_shm` là tên POSIX Shared Memory Object. Trên Linux, object này thường được biểu diễn bằng một filesystem object tương ứng trong `/dev/shm/my_shm`. Tuy nhiên, `/dev/shm` là chi tiết triển khai phổ biến của Linux, không phải yêu cầu bắt buộc của POSIX.
+- **B. `oflag` — Open Flags:** `oflag` xác định cách `shm_open()` xử lý object. Các flag quan trọng:
+  - `O_CREAT`: Tạo object nếu chưa tồn tại
+  - `O_EXCL`: Kết hợp với `O_CREAT` để yêu cầu object chưa tồn tại
+  - `O_RDONLY`: Mở chỉ đọc
+  - `O_RDWR`: Mở để đọc và ghi
+  - `O_CLOEXEC`: Đặt close-on-exec cho `FD`
+
+  **Ví dụ:**
+
+  Chỉ mở object đã tồn tại:
+
+  ```c
+  int fd = shm_open(
+    "/my_shm",
+    O_RDWR,
+    0
+  );
+  ```
+
+  Tạo mới nếu chưa tồn tại:
+
+  ```c
+  int fd = shm_open(
+    "/my_shm",
+    O_CREAT | O_RDWR,
+    0600
+  );
+  ```
+
+  Bắt buộc tạo object mới:
+
+  ```c
+  int fd = shm_open(
+    "/my_shm",
+    O_CREAT | O_EXCL | O_RDWR,
+    0600
+  );
+  ```
+
+  Nếu `/my_shm` đã tồn tại, trường hợp cuối thất bại với `EEXIST`
+
+> [!NOTE]
+> **Lưu ý:** `O_EXCL` có ý nghĩa đặc biệt khi kết hợp với `O_CREAT`. Nó giúp tránh tình trạng process tưởng rằng mình vừa tạo object mới nhưng thực tế lại mở một object đã tồn tại.
+
+- **C. `mode` — Permission Bits:** `mode` xác định quyền truy cập ban đầu khi tạo object mới. **Ví dụ:** `0600`, sẽ biểu diễn:
+  - **Owner:** Read  + Write
+  - **Group:** None
+  - **Other:** None
+
+  Một số mode phổ biến:
+
+  <div align="center">
+
+  | Mode |	Owner |	Group |	Other |
+  |:-:|-|-|-|
+  | `0600` |	Read/Write |	Không |	Không |
+  | `0640` |	Read/Write |	Read |	Không |
+  | `0660` |	Read/Write |	Read/Write |	Không |
+  | `0666` |	Read/Write |	Read/Write |	Read/Write |
+
+  </div>
+
+  Quyền thực tế còn chịu ảnh hưởng từ umask của process. **Ví dụ:** `umask`, nếu `umask` là `0022`, mode yêu cầu `0666` thường tạo ra permission thực tế `0644`. `mode` chỉ được sử dụng khi tạo object mới với `O_CREAT`. Nếu object đã tồn tại, giá trị này không thay đổi permission hiện có.
+
+> [!NOTE]
+> **Khuyến nghị:** Trong chương trình thử nghiệm Shared Memory, dùng `0600` thay vì `0666` nếu không có nhu cầu chia sẻ quyền với những user khác.
 
 ### 5.5. Demand Paging
 
