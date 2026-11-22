@@ -583,14 +583,11 @@ Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham
   Việc gọi một trong các API trên không đồng nghĩa với việc toàn bộ Shared Memory được giải phóng ngay lập tức. Kernel phải xét đến những mapping, file reference và tham chiếu còn tồn tại trước khi có thể thu hồi tài nguyên tương ứng.
 
 ## 2.Shared Memory Object
-
-Shared Memory Object (đối tượng bộ nhớ chia sẻ) là một đối tượng được hệ điều hành quản lý, đóng vai trò cung cấp tài nguyên bộ nhớ chung để nhiều tiến trình (process) có thể cùng mở và ánh xạ (mapping) vào Virtual Address Space của chúng.
-
-Trong POSIX Shared Memory, Shared Memory Object là đối tượng trung tâm liên kết các thao tác `shm_open()`, `ftruncate()`, `mmap()` và `shm_unlink()`. Để hiểu rõ bản chất, cần phân biệt rằng Shared Memory Object không phải là một con trỏ bộ nhớ, cũng không phải một vùng Virtual Address cố định. Nó là một đối tượng có danh tính, metadata, kích thước và nội dung dữ liệu được quản lý thông qua cơ chế của hệ điều hành. Trên Linux, POSIX Shared Memory thường được triển khai thông qua filesystem `tmpfs`, với mount point mặc định là `/dev/shm`.
-
 ### 2.1. Shared Memory Object là gì?
 
-Shared Memory Object là một đối tượng có tên (named object), được sử dụng làm backing object cho các vùng bộ nhớ được chia sẻ giữa nhiều tiến trình. **Ví dụ**, khi một chương trình gọi:
+`Shared Memory Object (đối tượng bộ nhớ chia sẻ - Объект разделяемой памяти)` là một đối tượng được hệ điều hành quản lý, `đối tượng có tên (named object - именованный объект)`, được sử dụng làm backing object cho các vùng bộ nhớ được chia sẻ giữa nhiều tiến trình, đóng vai trò cung cấp tài nguyên bộ nhớ chung để nhiều tiến trình (process) có thể cùng mở và ánh xạ (mapping) vào Virtual Address Space của chúng.
+
+Trong POSIX Shared Memory, Shared Memory Object là đối tượng trung tâm liên kết các thao tác `shm_open()`, `ftruncate()`, `mmap()` và `shm_unlink()`. Để hiểu rõ bản chất, cần phân biệt rằng Shared Memory Object không phải là một con trỏ bộ nhớ, cũng không phải một vùng Virtual Address cố định. Nó là một đối tượng có danh tính, metadata, kích thước và nội dung dữ liệu được quản lý thông qua cơ chế của hệ điều hành. Trên Linux, POSIX Shared Memory thường được triển khai thông qua filesystem `tmpfs`, với mount point mặc định là `/dev/shm`. **Ví dụ**, khi một chương trình gọi:
 
 ```c
 int fd = shm_open(
@@ -604,8 +601,8 @@ Linux sẽ tìm kiếm hoặc tạo một Shared Memory Object có tên `/my_shm
 
 Tuy nhiên, tại thời điểm này, cần phân biệt ba vấn đề:
 - **Object tồn tại:** Kernel đã có đối tượng Shared Memory tương ứng.
-- Object có kích thước: Được thiết lập thông qua `ftruncate()`.
-- Object được ánh xạ: Được thực hiện thông qua `mmap()`.
+- **Object có kích thước:** Được thiết lập thông qua `ftruncate()`.
+- **Object được ánh xạ:** Được thực hiện thông qua `mmap()`.
 
 Ba hoạt động này không xảy ra đồng thời và có mục đích khác nhau.
 
@@ -2228,7 +2225,7 @@ Tuy nhiên, không nên kỳ vọng RSS luôn tăng đúng 4 KiB. Kernel có th�
 
 ## 3. `shm_open()`
 
-`shm_open()` là hàm thuộc POSIX Shared Memory API, được sử dụng để tạo mới hoặc mở một Shared Memory Object thông qua tên định danh. Hàm này cung cấp điểm bắt đầu để các process có thể truy cập cùng một đối tượng bộ nhớ dùng chung.
+`shm_open()` là hàm thuộc POSIX Shared Memory API, được sử dụng để tạo mới hoặc mở một [Shared Memory Object](#2shared-memory-object) thông qua tên định danh. Hàm này cung cấp điểm bắt đầu để các process có thể truy cập cùng một đối tượng bộ nhớ dùng chung.
 
 ### 3.1. Function prototype
 
