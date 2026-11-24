@@ -51,11 +51,11 @@
     - [2.5.7. Cơ chế chia sẻ Backing Pages giữa nhiều Process](#257-cơ-chế-chia-sẻ-backing-pages-giữa-nhiều-process)
     - [2.5.8. `tmpfs`, `Swap` và vòng đời Physical Pages](#258-tmpfs-swap-và-vòng-đời-physical-pages)
     - [2.5.9. Thực nghiệm: Quan sát Shared Memory qua `/proc` và `smaps`](#259-thực-nghiệm-quan-sát-shared-memory-qua-proc-và-smaps)
-- 3. `shm_open()`
-  - 3.1. Function prototype
-  - 3.2. Tham số `name`, `oflag`, `mode`
-  - 3.3. `O_CREAT`, `O_EXCL`, `O_RDWR`
-  - 3.4. Cơ chế tạo và mở Shared Memory Object
+- [3.`shm_open()`](#3shm-open)
+  - [3.1. Function prototype](#31-function-prototype)
+  - [3.2. Tham số `name`, `oflag`, `mode`](#32-tham-số-name-oflag-mode)
+  - [3.3. `O_CREAT`, `O_EXCL`, `O_RDWR`](#33-o_creat-o_excl-o_rdwr)
+  - [3.4. Cơ chế tạo và mở Shared Memory Object](#34-cơ-chế-tạo-và-mở-shared-memory-object)
   - 3.5. File descriptor được trả về
   - 3.6. Error handling
   - 3.7. Phân tích System Call và Kernel implementation
@@ -582,6 +582,8 @@ Hai VMA thuộc hai tiến trình khác nhau, nhưng chúng có thể cùng tham
 
   Việc gọi một trong các API trên không đồng nghĩa với việc toàn bộ Shared Memory được giải phóng ngay lập tức. Kernel phải xét đến những mapping, file reference và tham chiếu còn tồn tại trước khi có thể thu hồi tài nguyên tương ứng.
 
+--- 
+
 ## 2.Shared Memory Object
 ### 2.1. Shared Memory Object là gì?
 
@@ -639,9 +641,9 @@ int fd = shm_open("/my_shm", O_CREAT | O_RDWR, 0666);
 #### 2.2.2. Quy tắc đặt tên POSIX Shared Memory
 
 POSIX quy định một số yêu cầu về tên Shared Memory Object.
-- Phải bắt đầu bằng `/`: vì tên phải có dấu `/` ở đầu
-- Không được có thêm `/`: vì tên portable chỉ có một dấu `/` ở đầu
-- Phải có ít nhất một ký tự sau `/`: vì `/` đơn độc không phải tên hợp lệ
+- **Phải bắt đầu bằng `/`:** vì tên phải có dấu `/` ở đầu
+- **Không được có thêm `/`:** vì tên portable chỉ có một dấu `/` ở đầu
+- **Phải có ít nhất một ký tự sau `/`:** vì `/` đơn độc không phải tên hợp lệ
 - Phân biệt chữ hoa và chữ thường `/MyShm` và `/myshm` là hai tên khác nhau
 
 **Ví dụ:**
@@ -2222,6 +2224,8 @@ ptr[0] = 'A';
 Có thể kiểm tra `/proc/<PID>/smaps` khi chương trình đang dừng tại `getchar()` đầu tiên, sau đó tiếp tục chương trình và kiểm tra lại tại `getchar()` thứ hai.Điều này giúp quan sát sự thay đổi của RSS và các trường liên quan khi mapping được truy cập.
 
 Tuy nhiên, không nên kỳ vọng RSS luôn tăng đúng 4 KiB. Kernel có thể cấp phát, fault-in hoặc xử lý trang theo trạng thái hiện có, số liệu còn chịu ảnh hưởng từ các lần truy cập và cơ chế quản lý bộ nhớ.
+
+---
 
 ## 3. `shm_open()`
 
