@@ -54,11 +54,13 @@
 - [3.`shm_open()`](#3shm-open)
   - [3.1. Function prototype](#31-function-prototype)
   - [3.2. Tham số `name`, `oflag`, `mode`](#32-tham-số-name-oflag-mode)
-  - [3.3. `O_CREAT`, `O_EXCL`, `O_RDWR`](#33-o_creat-o_excl-o_rdwr)
-  - [3.4. Cơ chế tạo và mở Shared Memory Object](#34-cơ-chế-tạo-và-mở-shared-memory-object)
-  - 3.5. File descriptor được trả về
-  - 3.6. Error handling
-  - 3.7. Phân tích System Call và Kernel implementation
+  - [3.3. Cơ chế tạo và mở Shared Memory Object](#33-cơ-chế-tạo-và-mở-shared-memory-object-shared-memory-object-creation-and-opening-mechanism)
+    - [3.3.1. Cơ chế tạo mới Shared Memory Object](#331-cơ-chế-tạo-mới-shared-memory-object)
+    - [3.3.2. Cơ chế mở Shared Memory Object đã tồn tại](#332-cơ-chế-mở-shared-memory-object-đã-tồn-tại)
+    - [3.3.3. Tạo hoặc mở object chưa đồng nghĩa với chia sẻ dữ liệu](#333-tạo-hoặc-mở-object-chưa-đồng-nghĩa-với-chia-sẻ-dữ-liệu)
+  - 3.4. File descriptor được trả về
+  - 3.5. Error handling
+  - 3.6. Phân tích System Call và Kernel implementation
 - 4.`ftruncate()`
   - 4.1. Function prototype
   - 4.2. Tại sao cần thiết lập kích thước?
@@ -109,6 +111,9 @@
   - 9.5. GDB: Theo dõi thao tác đọc/ghi
   - 9.6. Theo dõi System Call bằng strace
   - 9.7. Thực nghiệm vòng đời object
+- 10.Tổng kết
+  - 10.1. Phân biệt các API của chuyên đề
+  - 10.2. Tài liệu tham khảo
 
 </td>
 </tr>
@@ -2355,6 +2360,141 @@ Nếu object chưa tồn tại, `O_CREAT` yêu cầu tạo mới. Nếu object �
 
 > [!NOTE]
 > **Khuyến nghị:** Trong chương trình thử nghiệm Shared Memory, dùng `0600` thay vì `0666` nếu không có nhu cầu chia sẻ quyền với những user khác.
+
+### 3.3. Cơ chế tạo và mở Shared Memory Object (Shared Memory Object Creation and Opening Mechanism)
+
+`shm_open()` cung cấp cơ chế để một process tạo mới hoặc mở một Shared Memory Object đã tồn tại thông qua tên định danh (name). Trên Linux, POSIX Shared Memory thường được triển khai dựa trên `tmpfs`/`shmem`, thường được mount tại `/dev/shm`. Vì vậy, việc tạo hoặc mở Shared Memory Object có thể được quan sát thông qua các filesystem operation tương ứng.
+
+> [!IMPORTANT]
+> **Điểm cần phân biệt:** tạo hoặc mở object không đồng nghĩa với việc đã ánh xạ object vào không gian địa chỉ của process. Việc ánh xạ chỉ diễn ra khi process gọi `mmap()`.
+
+#### 3.3.1. Cơ chế tạo mới Shared Memory Object
+
+Khi một process gọi `shm_open()` với cờ `O_CREAT`, hệ thống sẽ yêu cầu tạo Shared Memory Object nếu object có tên tương ứng chưa tồn tại. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/my_shared_memory",
+    O_CREAT | O_RDWR,
+    0600
+);
+```
+
+Quá trình khái quát:
+
+```
+Process A
+    |
+    | shm_open("/my_shared_memory",
+    |           O_CREAT | O_RDWR, 0600)
+    |
+    v
+C Library (glibc)
+    |
+    v
+System Call / VFS
+    |
+    v
+tmpfs (/dev/shm)
+    |
+    v
+Name Lookup
+    |
+    v
+Object chưa tồn tại?
+    |
+    v
+Create Shared Memory Object
+    |
+    v
+Return File Descriptor
+```
+
+Sau khi tạo thành công:
+- Shared Memory Object được đưa vào namespace của hệ thống.
+- Object có tên để những process khác có thể tìm kiếm và mở.
+- Kernel quản lý metadata và các tài nguyên liên quan đến object.
+- Process tạo object nhận được một file descriptor để thao tác với object.
+
+> [!NOTE]
+> **Lưu ý:** Shared Memory Object mới tạo có kích thước ban đầu bằng `0`. Muốn sử dụng một vùng nhớ có kích thước cụ thể, process cần gọi `ftruncate()`.
+
+#### 3.3.2. Cơ chế mở Shared Memory Object đã tồn tại
+
+Nếu một process khác đã tạo Shared Memory Object, process hiện tại có thể gọi `shm_open()` với cùng tên để mở object đó. **Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/my_shared_memory",
+    O_RDWR,
+    0
+);
+```
+
+Quá trình khái quát:
+
+```
+Process B
+    |
+    | shm_open("/my_shared_memory", O_RDWR, 0)
+    |
+    v
+C Library (glibc)
+    |
+    v
+System Call / VFS
+    |
+    v
+tmpfs (/dev/shm)
+    |
+    v
+Name Lookup
+    |
+    v
+Object đã tồn tại?
+    |
+    v
+Open Existing Object
+    |
+    v
+Return File Descriptor
+```
+
+Trong trường hợp này:
+- Process B không tạo một Shared Memory Object mới.
+- Kernel tìm object đã tồn tại thông qua tên định danh.
+- Process B nhận một file descriptor tham chiếu đến object đó.
+- Process A và Process B có thể có các file descriptor khác nhau nhưng cùng tham chiếu đến một Shared Memory Object.
+
+#### 3.3.3. Tạo hoặc mở object chưa đồng nghĩa với chia sẻ dữ liệu
+
+Đây là điểm quan trọng nhất của cơ chế `shm_open()`. Giả sử Process A tạo object và Process B mở object đó thành công. Tại thời điểm này, cả hai process đã có khả năng tham chiếu đến cùng một object, nhưng chưa nhất thiết có vùng nhớ được ánh xạ để đọc và ghi dữ liệu. Để thực hiện việc chia sẻ dữ liệu, hai process cần ánh xạ object bằng `mmap()` với `MAP_SHARED`.
+
+```
+             Shared Memory Object
+                       |
+             +---------+---------+
+             |                   |
+         Process A           Process B
+             |                   |
+          shm_open()          shm_open()
+             |                   |
+          File FD              File FD
+             |                   |
+           mmap()              mmap()
+             |                   |
+       Virtual Address     Virtual Address
+             |                   |
+             +---------+---------+
+                       |
+               Shared Backing Pages
+```
+
+Hai process có thể nhận được hai địa chỉ ảo khác nhau, nhưng những địa chỉ đó có thể ánh xạ tới cùng các backing pages. Do đó, khi một process ghi dữ liệu vào vùng nhớ được chia sẻ, process còn lại có thể quan sát dữ liệu đó.
+
+### 3.4. File descriptor được trả về
+### 3.5. Error handling
+### 3.6. Phân tích System Call và Kernel implementation
 
 ### 5.5. Demand Paging
 
