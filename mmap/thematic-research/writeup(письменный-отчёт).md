@@ -58,7 +58,12 @@
     - [3.3.1. Cơ chế tạo mới Shared Memory Object](#331-cơ-chế-tạo-mới-shared-memory-object)
     - [3.3.2. Cơ chế mở Shared Memory Object đã tồn tại](#332-cơ-chế-mở-shared-memory-object-đã-tồn-tại)
     - [3.3.3. Tạo hoặc mở object chưa đồng nghĩa với chia sẻ dữ liệu](#333-tạo-hoặc-mở-object-chưa-đồng-nghĩa-với-chia-sẻ-dữ-liệu)
-  - 3.4. File descriptor được trả về
+  - [3.4. File descriptor được trả về](#34-file-descriptor-được-trả-về)
+    - [3.4.1. Giá trị trả về của `shm_open()`](#341-giá-trị-trả-về-của-shm_open)
+    - [3.4.2. Quan hệ giữa File Descriptor và struct file](#342-quan-hệ-giữa-file-descriptor-và-struct-file)
+    - [3.4.3. File Descriptor được sử dụng như thế nào?](#343-file-descriptor-được-sử-dụng-như-thế-nào)
+    - [3.4.4. close(fd) có làm mất Shared Memory Mapping không?](#344-closefd-có-làm-mất-shared-memory-mapping-không)
+    - [3.4.5. Cờ FD_CLOEXEC](#345-cờ-fd_cloexec)
   - 3.5. Error handling
   - 3.6. Phân tích System Call và Kernel implementation
 - 4.`ftruncate()`
@@ -2493,6 +2498,264 @@ Trong trường hợp này:
 Hai process có thể nhận được hai địa chỉ ảo khác nhau, nhưng những địa chỉ đó có thể ánh xạ tới cùng các backing pages. Do đó, khi một process ghi dữ liệu vào vùng nhớ được chia sẻ, process còn lại có thể quan sát dữ liệu đó.
 
 ### 3.4. File descriptor được trả về
+
+Khi gọi `shm_open()` thành công, hệ thống trả về một File Descriptor (FD) — một giá trị số nguyên không âm đại diện cho một mục trong bảng quản lý file descriptor (File Descriptor Table) của process hiện tại. File descriptor cho phép process tiếp tục thao tác với Shared Memory Object thông qua các API như `ftruncate()`, `fstat()`, `mmap()` và `close()`.
+
+> [!IMPORTANT]
+> **Điều quan trọng cần hiểu:** File Descriptor không phải Shared Memory Object, cũng không phải địa chỉ bộ nhớ. Nó là một định danh mà process sử dụng để tham chiếu đến tài nguyên đã mở.
+
+#### 3.4.1. Giá trị trả về của `shm_open()`
+
+Các giá trị trả về được trình bày như sau:
+- `fd >= 0`: Mở hoặc tạo Shared Memory Object thành công
+- `-1`: Thao tác thất bại, thông tin lỗi được lưu trong errno
+
+**Ví dụ:**
+
+```c
+int fd = shm_open(
+    "/my_shared_memory",
+    O_CREAT | O_RDWR,
+    0600
+);
+
+if (fd == -1) {
+    perror("shm_open");
+    return 1;
+}
+
+printf("File Descriptor: %d\n", fd);
+```
+
+Nếu thành công, `fd` có thể nhận giá trị như `3`, `4`, `5`,...
+
+- **Tại sao thường thấy `FD` bắt đầu từ `3`?:** Thông thường, khi process khởi chạy, ba file descriptor đầu tiên đã được sử dụng:
+
+  <div align="center">
+
+  | FD	| Tên	| Chức năng |
+  |-|-|-|
+  | 0 |	stdin |	Standard Input |
+  | 1	| stdout |	Standard Output |
+  | 2	| stderr |	Standard Error |
+  | 3	| Có thể là `FD` từ `shm_open()` |	Shared Memory Object |
+
+  </div>
+
+  `FD` được cấp phát từ số nguyên nhỏ nhất hiện đang chưa được sử dụng trong bảng FD của process. Vì vậy, 3 không phải giá trị cố định mà POSIX quy định.
+
+#### 3.4.2. Quan hệ giữa File Descriptor và struct file
+
+Khi `shm_open()` thành công trên Linux, quá trình mở object dẫn đến việc tạo hoặc lấy một tham chiếu đến đối tượng struct file, sau đó cài đặt `FD` tương ứng trong bảng `FD` của process.
+
+```
+Có thể mô tả quan hệ này:
+Process A
+    |
+    v
+File Descriptor Table
+    |
+    | FD = 3
+    v
+struct file
+    |
+    v
+struct inode
+    |
+    v
+Shared Memory Object
+```
+
+> [!NOTE]
+> **Một số điểm cần chú ý:**
+> - `struct file` đại diện cho trạng thái của một lần mở file (open file description).
+> - `struct inode` đại diện cho filesystem object.
+> - Hai lần mở cùng một Shared Memory Object bằng hai lời gọi `shm_open()` độc lập có thể tạo hai `struct file` khác nhau nhưng cùng tham chiếu đến một inode.
+> - Nếu sử dụng `dup()` hoặc kế thừa `FD` qua `fork()`, các descriptor tương ứng có thể cùng tham chiếu đến một open file description.
+
+Đây là lý do `FD` của hai process có thể khác nhau nhưng vẫn truy cập cùng một Shared Memory Object
+
+#### 3.4.3. File Descriptor được sử dụng như thế nào?
+
+Sau khi nhận FD, process có thể truyền nó cho các API khác.
+- `ftruncate(fd, length)`: Thay đổi kích thước Shared Memory Object
+- `fstat(fd, &statbuf)`: Lấy metadata của object
+- `mmap(..., fd, offset)`: Ánh xạ object vào Virtual Address Space
+- `close(fd)`: Đóng file descriptor
+
+**Ví dụ:**
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(void)
+{
+    int fd = shm_open(
+        "/my_shared_memory",
+        O_CREAT | O_RDWR,
+        0600
+    );
+
+    if (fd == -1) {
+        perror("shm_open");
+        return EXIT_FAILURE;
+    }
+
+    /* Thiết lập kích thước object */
+    if (ftruncate(fd, 4096) == -1) {
+        perror("ftruncate");
+        close(fd);
+        shm_unlink("/my_shared_memory");
+        return EXIT_FAILURE;
+    }
+
+    /* Lấy metadata */
+    struct stat st;
+
+    if (fstat(fd, &st) == -1) {
+        perror("fstat");
+        close(fd);
+        shm_unlink("/my_shared_memory");
+        return EXIT_FAILURE;
+    }
+
+    printf("FD: %d\n", fd);
+    printf("Object size: %lld bytes\n",
+           (long long)st.st_size);
+
+    /* Ánh xạ Shared Memory Object */
+    void *ptr = mmap(
+        NULL,
+        4096,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED,
+        fd,
+        0
+    );
+
+    if (ptr == MAP_FAILED) {
+        perror("mmap");
+        close(fd);
+        shm_unlink("/my_shared_memory");
+        return EXIT_FAILURE;
+    }
+
+    printf("Virtual Address: %p\n", ptr);
+
+    munmap(ptr, 4096);
+    close(fd);
+    shm_unlink("/my_shared_memory");
+
+    return EXIT_SUCCESS;
+}
+```
+
+Điểm đáng chú ý trong ví dụ:
+- `fd` được dùng để xác định Shared Memory Object.
+- `ftruncate()` thiết lập kích thước object thành `4096` bytes.
+- `mmap()` sử dụng FD đó để tạo mapping.
+- `ptr` là địa chỉ ảo mà process sử dụng để truy cập vùng nhớ.
+
+`FD` và `ptr` là hai giá trị hoàn toàn khác nhau, phục vụ hai mục đích khác nhau.
+
+#### 3.4.4. close(fd) có làm mất Shared Memory Mapping không?
+
+Không. Đây là một điểm rất quan trọng trong cơ chế quản lý tài nguyên của Linux. Khi gọi `close(fd);`, kernel đóng file descriptor của process. Tuy nhiên, nếu process đã gọi `mmap()` thành công trước đó, mapping vẫn có thể tồn tại. **Ví dụ:**
+
+```
+shm_open()
+    |
+    v
+FD = 3
+    |
+    v
+mmap()
+    |
+    v
+Virtual Memory Mapping
+    |
+    +------ close(fd)
+    |              |
+    |              v
+    |       FD được đóng
+    |
+    v
+Mapping vẫn tồn tại
+```
+
+Lý do là mapping có tham chiếu riêng đến đối tượng backing file. Việc đóng FD không đồng nghĩa với việc xóa VMA hoặc giải phóng ngay các backing pages. Muốn gỡ mapping, process phải gọi `munmap(ptr, 4096);`. Cần phân biệt ba thao tác:
+
+<div align="center">
+
+| API |	Tác động |
+|-|-|
+| `close(fd)`	| Đóng file descriptor |
+| `munmap(ptr, length)`	| Gỡ memory mapping |
+| `shm_unlink(name)`	| Xóa tên object khỏi namespace |
+
+</div>
+
+Ba thao tác này không thể thay thế cho nhau.
+
+#### 3.4.5. Cờ FD_CLOEXEC
+
+Một đặc điểm đáng chú ý của `shm_open()` là file descriptor được trả về có cờ `FD_CLOEXEC` được thiết lập theo POSIX. `FD_CLOEXEC` có nghĩa là file descriptor sẽ tự động được đóng khi process thực hiện thành công một thao tác `exec()`. **Ví dụ:**
+
+```c
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+
+int main(void)
+{
+    int fd = shm_open(
+        "/my_shared_memory",
+        O_CREAT | O_RDWR,
+        0600
+    );
+
+    if (fd == -1) {
+        perror("shm_open");
+        return 1;
+    }
+
+    int flags = fcntl(fd, F_GETFD);
+
+    if (flags == -1) {
+        perror("fcntl");
+        return 1;
+    }
+
+    printf("FD flags: 0x%x\n", flags);
+
+    if (flags & FD_CLOEXEC)
+        puts("FD_CLOEXEC is enabled");
+
+    close(fd);
+    shm_unlink("/my_shared_memory");
+
+    return 0;
+}
+```
+
+Phân biệt:
+
+<div align="center">
+
+| Cờ	| Thuộc tính |	Ý nghĩa |
+|-|-|-|
+| `FD_CLOEXEC` |	File descriptor flag |	Đóng `FD` khi `exec()` thành công |
+| `O_CLOEXEC`	| Open flag	| Yêu cầu thiết lập close-on-exec khi mở file qua những API hỗ trợ cờ này |
+
+</div>
+
+`FD_CLOEXEC` không có nghĩa là Shared Memory Object bị xóa khi `exec()` xảy ra. Nó chỉ kiểm soát vòng đời của file descriptor.
+
 ### 3.5. Error handling
 ### 3.6. Phân tích System Call và Kernel implementation
 
